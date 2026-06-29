@@ -140,14 +140,42 @@ Exchange (detta repo) är den riktiga servern som körs under kursen.
 
 Exchange-servern är skriven i **Node.js/Express** (JavaScript, ESM). Avsiktligt enkelt — den ska inte vara ett läromedel i sig, utan fungera pålitligt som extern tjänst.
 
+## Nyckelverifiering mot api-servern
+
+Exchange verifierar studenters API-nycklar mot `bth-mvc/api-server` via `POST /service/verify`. Svaret innehåller `webhookUrl` och `webhookSecret` per student — exchange behöver dessa för att skicka webhooks vid matchade ordrar.
+
+### Verifieringsflöde
+
+```
+Student → POST /orders (X-Api-Key: mvc_xxx)
+Exchange → POST api-server/service/verify { apiKey: "mvc_xxx" }
+Api-server → { valid: true, acronym: "abc", webhookUrl: "...", webhookSecret: "..." }
+Exchange → cachat i minnet, svarar studenten
+```
+
+### Cache-strategi
+
+Verifieringsresultatet cachas **i minnet med 24 timmars TTL** per API-nyckel. Det innebär:
+
+- Inga upprepade anrop till api-servern under ett dygn
+- Exchange fortsätter fungera om api-servern är tillfälligt nere (för sedan cachade nycklar)
+- Återkallning slår igenom vid nästa cache-expiry (max 24h)
+- Vid omstart töms cachen — alla nycklar verifieras på nytt vid första anropet
+
+Implementation: en `Map<apiKey, { data, expiresAt }>` räcker. Ingen extern cache (Redis etc.) behövs.
+
+### Fallback-beteende
+
+Om api-servern inte svarar och nyckeln inte finns i cachen → returnera `401 Unauthorized`. Fail-closed är rätt val för en börs.
+
 ## Miljövariabler
 
 | Variabel | Default | Beskrivning |
 |---|---|---|
 | `PORT` | `4000` | Port att lyssna på |
-| `API_KEY` | `test-api-key-for-development` | Gemensam eller per-student |
-| `WEBHOOK_SECRET` | `test-webhook-secret-for-development` | HMAC-hemlighet per student |
-| `WEBHOOK_URL` | `http://localhost:3000/api/webhooks/exchange` | Studentserverns webhook-URL |
+| `API_KEY_SERVER_URL` | `http://localhost:5000` | URL till api-servern |
+| `SERVICE_TOKEN` | — | X-Service-Token för anrop till api-servern (krävs) |
+| `KEY_CACHE_TTL_MS` | `86400000` | Cache-TTL i ms (default 24h) |
 
 ## API-dokumentation
 
