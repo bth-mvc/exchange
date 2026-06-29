@@ -5,6 +5,7 @@ const schema = z.object({
   API_KEY_SERVER_URL: z.string().url().default('http://localhost:5000'),
   SERVICE_TOKEN: z.string().min(1),
   KEY_CACHE_TTL_MS: z.coerce.number().default(86_400_000),
+  DEV_API_KEY: z.string().optional(),
   DB_PATH: z.string().default('./data/exchange.db'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })

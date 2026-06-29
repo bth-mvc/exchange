@@ -23,6 +23,12 @@ export async function apiKeyAuth(req: Request, res: Response, next: NextFunction
     return
   }
 
+  if (env.NODE_ENV === 'development' && env.DEV_API_KEY && apiKey === env.DEV_API_KEY) {
+    res.locals.student = { acronym: 'dev', webhookUrl: '', webhookSecret: 'dev-secret' }
+    next()
+    return
+  }
+
   const cached = cache.get(apiKey)
   if (cached && Date.now() < cached.expiresAt) {
     res.locals.student = cached.data

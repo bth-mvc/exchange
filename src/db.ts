@@ -1,7 +1,13 @@
 import Database from 'better-sqlite3'
+import { mkdirSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { env } from './config/env.js'
 
 const dbPath = env.NODE_ENV === 'test' ? ':memory:' : env.DB_PATH
+
+if (dbPath !== ':memory:') {
+  mkdirSync(dirname(dbPath), { recursive: true })
+}
 
 export const db = new Database(dbPath)
 
