@@ -29,7 +29,7 @@ export class MarketCommands extends BaseCommand {
 
   constructor() {
     super()
-    const url = (process.env.EXCHANGE_URL ?? 'http://localhost:4001').replace(/\/$/, '')
+    const url = (process.env.EXCHANGE_URL ?? 'http://localhost:4000').replace(/\/$/, '')
     const apiKey = process.env.API_KEY ?? ''
     this.req = makeClient(url, apiKey)
   }
