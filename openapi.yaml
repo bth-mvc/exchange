@@ -1,0 +1,194 @@
+openapi: '3.1.0'
+info:
+  title: BTH Exchange
+  description: Tokenbörsen för MVC-kursen vid BTH
+  version: '1.0.0'
+
+servers:
+  - url: http://localhost:4000
+    description: Lokal dev
+
+security:
+  - apiKey: []
+
+tags:
+  - name: assets
+    description: Tokens och orderbok
+  - name: orders
+    description: Lägg ordrar
+  - name: trades
+    description: Handelshistorik
+  - name: portfolio
+    description: Portfölj
+  - name: leaderboard
+    description: Rankningslista
+  - name: market
+    description: SSE market feed
+
+paths:
+  /health:
+    get:
+      summary: Hälsostatus
+      security: []
+      responses:
+        '200':
+          description: OK
+
+  /assets:
+    get:
+      tags: [assets]
+      summary: Lista alla tokens med aktuellt pris
+      responses:
+        '200':
+          description: Lista med tokens
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /assets/{id}/orderbook:
+    get:
+      tags: [assets]
+      summary: Orderbok för en specifik token
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: FIKA
+      responses:
+        '200':
+          description: Orderbok med bids och asks
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /orders:
+    post:
+      tags: [orders]
+      summary: Lägg en order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, side, amount, price]
+              properties:
+                token:
+                  type: string
+                  example: FIKA
+                side:
+                  type: string
+                  enum: [buy, sell]
+                amount:
+                  type: integer
+                  minimum: 1
+                  example: 10
+                price:
+                  type: number
+                  example: 10.50
+                userId:
+                  type: string
+                  example: user-123
+      responses:
+        '201':
+          description: Order lagd (fylls inom 1 sekund)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /trades:
+    get:
+      tags: [trades]
+      summary: Handelshistorik med cursor-paginering
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista med trades och nästa cursor
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /portfolio:
+    get:
+      tags: [portfolio]
+      summary: Studentens portfölj
+      responses:
+        '200':
+          description: Balans, holdings och totalvärde
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /leaderboard:
+    get:
+      tags: [leaderboard]
+      summary: Rankningslista sorterad på portföljvärde
+      responses:
+        '200':
+          description: Rankad lista med alla studenter
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /market/feed:
+    get:
+      tags: [market]
+      summary: SSE market feed
+      description: |
+        Server-Sent Events stream. Events: `connected`, `price`, `trade`.
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: 'Studentens API-nyckel. Kan även skickas som query-parameter: ?api_key=<key>'
+
+  responses:
+    Unauthorized:
+      description: Ogiltig eller saknad API-nyckel
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+    BadRequest:
+      description: Ogiltig request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+    NotFound:
+      description: Resursen hittades inte
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
