@@ -4,42 +4,109 @@
 
 Tokenbörsen för MVC-kursen vid BTH. Gemensam exchange-server som alla studenters applikationer ansluter mot.
 
-## Komma igång
-
-```bash
-cp .env.example .env   # justera PORT, SERVICE_TOKEN och API_KEY_SERVER_URL
-npm install
-npm run dev
-```
-
 ## Kommandon
 
 | Kommando | Vad |
 |---|---|
-| `npm run dev` | Starta med hot reload |
+| `npm run dev` | Starta lokalt med hot reload |
 | `npm run tui` | Interaktivt CLI mot lokal dev-server |
-| `npm run tui:prod` | Interaktivt CLI mot produktionsservern |
 | `npm run tui:docker` | Interaktivt CLI mot lokal Docker-instans |
+| `npm run tui:prod` | Interaktivt CLI mot produktionsservern |
 | `npm run check` | Typecheck + lint + format + test |
 | `npm test` | Kör tester |
 | `npm run test:coverage` | Tester med coverage-rapport |
 | `npm run build` | Kompilera TypeScript |
+| `npm run release:patch` | Kör check, bumpar patch-version och pushar tagg |
 | `npm run clean` | Ta bort node_modules och package-lock |
 | `npm run clean:all` | Ta även bort dist, coverage och data |
 
-## Testa med TUI
+---
 
-Servern har ett interaktivt CLI för att manuellt testa alla endpoints. `DEV_API_KEY` i `.env` gör att api-servern inte behövs.
+## 1. Lokalt (utan Docker)
 
-Starta sedan TUI:n (med servern igång i en annan terminal):
+```bash
+cp .env.example .env   # justera PORT och SERVICE_TOKEN
+npm install
+npm run dev
+```
+
+`DEV_API_KEY` i `.env` gör att exchange accepterar den nyckeln utan att kontakta api-servern — du kan testa lokalt utan att ha api-servern igång.
+
+Verifiera i en annan terminal:
+
+```bash
+curl http://localhost:4001/health
+# {"status":"ok","uptime":...}
+```
+
+Testa med TUI (servern igång i en terminal, TUI i en annan):
 
 ```bash
 npm run tui
+> server health
+> assets
+> orders buy FIKA 10 10.50
+> portfolio show
 ```
 
-Exempel på kommandon i TUI:n:
+---
+
+## 2. Lokalt med Docker
+
+```bash
+cp .env.docker.example .env.docker   # justera SERVICE_TOKEN och PORT
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Exchange binder på `127.0.0.1:PORT` (default 4000) utan Caddy framför.
+
+Verifiera:
+
+```bash
+curl http://localhost:4000/health
+# {"status":"ok","uptime":...}
+```
+
+Testa med TUI — sätt `EXCHANGE_URL=http://localhost:4000` i `.env.docker` och kör:
+
+```bash
+npm run tui:docker
+> server health
+> assets
+```
+
+Stoppa:
+
+```bash
+docker compose -f docker-compose.prod.yml down
+```
+
+---
+
+## 3. Produktion
+
+Se [DEPLOY.md](DEPLOY.md) för fullständig guide: droplet-setup, host-Caddy, CD via GitHub Actions.
+
+Testa mot produktionsservern med TUI:
+
+```bash
+cp .env.prod.example .env.prod   # fyll i EXCHANGE_URL och API_KEY
+npm run tui:prod
+> server health
+> board show
+```
+
+---
+
+## API
+
+Swagger UI finns på `/docs` när servern körs. Se även [CLAUDE.md](CLAUDE.md) för fullständigt API-kontrakt.
+
+TUI-kommandon som fungerar i alla tre miljöer:
 
 ```
+> server health                 # kolla att servern är igång
+> server docs                   # visa URL till Swagger UI
 > assets                        # lista alla tokens med pris
 > market orderbook FIKA         # visa orderboken för FIKA
 > orders buy FIKA 10 10.50      # köp 10 FIKA à 10.50
@@ -48,33 +115,4 @@ Exempel på kommandon i TUI:n:
 > trades list                   # se dina senaste trades
 > board show                    # leaderboard
 > help                          # lista alla kommandon
-> exit                          # avsluta
 ```
-
-Kommandogruppen kan utelämnas om den matchar `defaultGroup` (som är `market`). Skriv alltså bara `assets` istället för `market assets`.
-
-## Testa med Docker
-
-```bash
-cp .env.docker.example .env.docker   # fyll i SERVICE_TOKEN, API_KEY_SERVER_URL och DOMAIN
-docker compose -f docker-compose.prod.yml up -d --build
-```
-
-Verifiera:
-
-```bash
-curl http://localhost/health
-# {"status":"ok","uptime":...}
-
-curl http://localhost/assets -H "X-Api-Key: <din-nyckel>"
-```
-
-> Se [DEPLOY.md](DEPLOY.md) för hur host-Caddy konfigureras på delad droplet.
-
-## API
-
-Swagger UI finns på `/docs` när servern körs. Se även [CLAUDE.md](CLAUDE.md) för fullständigt API-kontrakt.
-
-## Driftsättning
-
-Se [DEPLOY.md](DEPLOY.md).
