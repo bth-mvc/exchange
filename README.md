@@ -17,7 +17,8 @@ npm run dev
 | Kommando | Vad |
 |---|---|
 | `npm run dev` | Starta med hot reload |
-| `npm run tui` | Interaktivt CLI för test och admin |
+| `npm run tui` | Interaktivt CLI mot lokal dev-server |
+| `npm run tui:docker` | Interaktivt CLI mot Docker-instansen |
 | `npm run check` | Typecheck + lint + format + test |
 | `npm test` | Kör tester |
 | `npm run test:coverage` | Tester med coverage-rapport |
