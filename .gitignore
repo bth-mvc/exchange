@@ -4,4 +4,5 @@ data/
 coverage/
 .env
 .env.docker
+.env.prod
 *.db

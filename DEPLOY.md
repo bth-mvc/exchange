@@ -1,6 +1,6 @@
 # Driftsättning
 
-Exchange-servern körs som en Docker-container bakom Caddy, med nginx som yttre reverse proxy (TLS via certbot). Ny kod deployas automatiskt när du pushar en `v*`-tagg till GitHub.
+Exchange-servern körs som en Docker-container på en DigitalOcean-droplet. En host-installerad Caddy hanterar TLS och reverse proxy för alla tjänster på dropleten. Ny kod deployas automatiskt när du pushar en `v*`-tagg till GitHub.
 
 Exchange är beroende av api-servern för nyckelverifiering — se till att api-servern är uppe och åtkomlig innan du startar exchange.
 
@@ -8,7 +8,7 @@ Exchange är beroende av api-servern för nyckelverifiering — se till att api-
 
 - DigitalOcean-droplet (delas med api-server och övriga tjänster)
 - Domännamn med en A-record som pekar på dropletens IP (`exchange.example.com → <IP>`)
-- nginx och certbot installerade på dropleten
+- Docker och Caddy installerade på dropleten
 - api-servern körs och är åtkomlig
 - GitHub-repo med Actions aktiverat
 
@@ -35,6 +35,15 @@ ssh root@<IP>
 
 ```bash
 curl -fsSL https://get.docker.com | sh
+```
+
+### Caddy (på host)
+
+```bash
+apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
+apt update && apt install caddy
 ```
 
 ### Brandvägg
@@ -67,17 +76,15 @@ Fyll i:
 
 ```
 PORT=4000
-HTTP_PORT=8082
-HTTPS_PORT=8442
 API_KEY_SERVER_URL=https://api.example.com
-SERVICE_TOKEN=<samma värde som SERVICE_TOKEN i api-serverns .env>
-KEY_CACHE_TTL_MS=86400000
-DB_PATH=./data/exchange.db
+SERVICE_TOKEN=<samma värde som SERVICE_TOKEN i api-serverns .env.docker>
 NODE_ENV=production
 DOMAIN=exchange.example.com
 ```
 
 Generera SERVICE_TOKEN med: `openssl rand -hex 32`
+
+> `HTTP_PORT`, `HTTPS_PORT` och TUI-variablerna behövs inte i prod — Caddy körs på host.
 
 ### Skapa datakatalogen
 
@@ -85,58 +92,48 @@ Generera SERVICE_TOKEN med: `openssl rand -hex 32`
 mkdir -p /opt/exchange/data
 ```
 
-### Starta tjänsten
+### Starta exchange
 
 ```bash
-docker compose --env-file .env.docker up -d --build
+docker compose -f docker-compose.prod.yml up -d --build
 ```
+
+Exchange lyssnar nu på `127.0.0.1:4000` — inte åtkomlig utifrån utan Caddy.
 
 ---
 
-## 3. Konfigurera nginx
+## 3. Konfigurera host-Caddy
 
-Exchange Caddy lyssnar på `HTTP_PORT` (8082) internt. Nginx proxyas dit och hanterar TLS.
+Lägg till ett block för exchange i `/etc/caddy/Caddyfile` (samma fil som api-servern använder):
 
-Skapa `/etc/nginx/sites-available/exchange`:
-
-```nginx
-server {
-    server_name exchange.example.com;
-
-    location / {
-        proxy_pass http://localhost:8082;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Connection '';
-    }
+```
+exchange.example.com {
+    reverse_proxy localhost:4000
 }
 ```
 
-Aktivera och hämta TLS-certifikat:
+> Porten måste matcha `PORT` i `.env.docker`.
+
+Ladda om Caddy:
 
 ```bash
-ln -s /etc/nginx/sites-available/exchange /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
-certbot --nginx -d exchange.example.com
+systemctl reload caddy
 ```
 
-Verifiera:
+Caddy hämtar automatiskt TLS-certifikat från Let's Encrypt. Verifiera:
 
 ```bash
 curl https://exchange.example.com/health
 # {"status":"ok","uptime":...}
 ```
 
-> SSE-endpoints (`/market/feed`) kräver att nginx inte buffrar svaret. Lägg till `proxy_buffering off;` i location-blocket om du märker problem med SSE.
+> **SSE:** `/market/feed` är en SSE-endpoint. Caddy buffrar inte SSE-svar som standard — ingen extra konfiguration behövs.
 
 ---
 
 ## 4. Konfigurera CD (GitHub Actions)
 
-CD-pipelinen SSH:ar in på servern och kör `git pull && docker compose --env-file .env.docker up -d --build` vid ny tagg.
+CD-pipelinen SSH:ar in på servern och kör `git pull && docker compose -f docker-compose.prod.yml up -d --build` vid ny tagg.
 
 ### Skapa SSH-nyckelpar för deploy
 
@@ -165,11 +162,10 @@ I repot: **Settings → Secrets and variables → Actions → New repository sec
 ## 5. Deploya en ny version
 
 ```bash
-git tag v1.0.1
-git push --tags
+npm run release:patch   # eller release:minor / release:major
 ```
 
-GitHub Actions kör `.github/workflows/deploy.yml` som SSH:ar in och startar om containrarna med den nya koden.
+Kör check, bumpar versionen och pushar en tagg — GitHub Actions deployas automatiskt.
 
 ---
 
@@ -177,19 +173,19 @@ GitHub Actions kör `.github/workflows/deploy.yml` som SSH:ar in och startar om 
 
 ```bash
 # Visa körande containrar
-docker compose --env-file .env.docker ps
+docker compose -f docker-compose.prod.yml ps
 
 # Visa loggar (följ)
-docker compose --env-file .env.docker logs -f
+docker compose -f docker-compose.prod.yml logs -f
 
 # Starta om
-docker compose --env-file .env.docker restart
+docker compose -f docker-compose.prod.yml restart
 
 # Uppdatera manuellt (utan CD)
-git pull && docker compose --env-file .env.docker up -d --build
+git pull && docker compose -f docker-compose.prod.yml up -d --build
 
 # Stoppa allt
-docker compose --env-file .env.docker down
+docker compose -f docker-compose.prod.yml down
 ```
 
 ## Säkerhetskopia av databasen
@@ -209,9 +205,9 @@ Schemalägg med cron:
 ## Nollställ databasen (ny kursomgång)
 
 ```bash
-docker compose --env-file .env.docker down
+docker compose -f docker-compose.prod.yml down
 rm /opt/exchange/data/exchange.db
-docker compose --env-file .env.docker up -d
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 Alla studenters portföljer och handelshistorik raderas. Studenternas API-nycklar berörs inte (de lever i api-servern).

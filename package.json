@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "tsx watch --env-file=.env src/index.ts",
     "tui": "tsx --env-file=.env tui/index.ts",
+    "tui:prod": "tsx --env-file=.env.prod tui/index.ts",
     "tui:docker": "tsx --env-file=.env.docker tui/index.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/src/index.js",
@@ -21,6 +22,9 @@
     "clean": "rm -rf node_modules/ package-lock.json",
     "clean:all": "npm run clean && rm -rf dist/ coverage/ data/",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
+    "release:patch": "npm run check && npm version patch && git push --no-verify && git push --tags --no-verify",
+    "release:minor": "npm run check && npm version minor && git push --no-verify && git push --tags --no-verify",
+    "release:major": "npm run check && npm version major && git push --no-verify && git push --tags --no-verify",
     "prepare": "husky"
   },
   "dependencies": {

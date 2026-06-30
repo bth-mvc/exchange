@@ -18,7 +18,8 @@ npm run dev
 |---|---|
 | `npm run dev` | Starta med hot reload |
 | `npm run tui` | Interaktivt CLI mot lokal dev-server |
-| `npm run tui:docker` | Interaktivt CLI mot Docker-instansen |
+| `npm run tui:prod` | Interaktivt CLI mot produktionsservern |
+| `npm run tui:docker` | Interaktivt CLI mot lokal Docker-instans |
 | `npm run check` | Typecheck + lint + format + test |
 | `npm test` | Kör tester |
 | `npm run test:coverage` | Tester med coverage-rapport |
@@ -55,8 +56,8 @@ Kommandogruppen kan utelämnas om den matchar `defaultGroup` (som är `market`).
 ## Testa med Docker
 
 ```bash
-cp .env.docker.example .env.docker   # fyll i SERVICE_TOKEN, API_KEY_SERVER_URL, DOMAIN och portar
-docker compose --env-file .env.docker up -d --build
+cp .env.docker.example .env.docker   # fyll i SERVICE_TOKEN, API_KEY_SERVER_URL och DOMAIN
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 Verifiera:
@@ -68,7 +69,7 @@ curl http://localhost/health
 curl http://localhost/assets -H "X-Api-Key: <din-nyckel>"
 ```
 
-> Sätt `DOMAIN=localhost` i `.env.docker` för lokal Docker-testning utan TLS.
+> Se [DEPLOY.md](DEPLOY.md) för hur host-Caddy konfigureras på delad droplet.
 
 ## API
 

@@ -23,6 +23,6 @@ jobs:
             set -e
             cd /opt/exchange
             git pull
-            docker compose --env-file .env.docker up -d --build
-            docker compose --env-file .env.docker ps
+            docker compose -f docker-compose.prod.yml up -d --build
+            docker compose -f docker-compose.prod.yml ps
           "
