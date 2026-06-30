@@ -7,7 +7,7 @@ Tokenbörsen för MVC-kursen vid BTH. Gemensam exchange-server som alla studente
 ## Komma igång
 
 ```bash
-cp .env.example .env   # fyll i SERVICE_TOKEN (och API_KEY_SERVER_URL om inte localhost)
+cp .env.example .env   # justera PORT, SERVICE_TOKEN och API_KEY_SERVER_URL
 npm install
 npm run dev
 ```
@@ -27,14 +27,7 @@ npm run dev
 
 ## Testa med TUI
 
-Servern har ett interaktivt CLI för att manuellt testa alla endpoints. Kräver en giltig API-nyckel från api-servern.
-
-Lägg till i `.env`:
-
-```
-EXCHANGE_URL=http://localhost:4001
-API_KEY=mvc_din-nyckel-här
-```
+Servern har ett interaktivt CLI för att manuellt testa alla endpoints. `DEV_API_KEY` i `.env` gör att api-servern inte behövs.
 
 Starta sedan TUI:n (med servern igång i en annan terminal):
 
@@ -61,7 +54,7 @@ Kommandogruppen kan utelämnas om den matchar `defaultGroup` (som är `market`).
 ## Testa med Docker
 
 ```bash
-cp .env.example .env   # fyll i SERVICE_TOKEN, API_KEY_SERVER_URL och DOMAIN
+cp .env.docker.example .env.docker   # fyll i SERVICE_TOKEN, API_KEY_SERVER_URL och DOMAIN
 docker compose up -d --build
 ```
 
@@ -74,7 +67,7 @@ curl http://localhost/health
 curl http://localhost/assets -H "X-Api-Key: <din-nyckel>"
 ```
 
-> Sätt `DOMAIN=localhost` i `.env` för lokal Docker-testning utan TLS.
+> Sätt `DOMAIN=localhost` i `.env.docker` för lokal Docker-testning utan TLS.
 
 ## API
 
