@@ -6,3 +6,4 @@ coverage/
 .env.docker
 .env.prod
 *.db
+.claude/settings.local.json
