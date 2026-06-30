@@ -54,8 +54,8 @@ Kommandogruppen kan utelämnas om den matchar `defaultGroup` (som är `market`).
 ## Testa med Docker
 
 ```bash
-cp .env.docker.example .env.docker   # fyll i SERVICE_TOKEN, API_KEY_SERVER_URL och DOMAIN
-docker compose up -d --build
+cp .env.docker.example .env.docker   # fyll i SERVICE_TOKEN, API_KEY_SERVER_URL, DOMAIN och portar
+docker compose --env-file .env.docker up -d --build
 ```
 
 Verifiera:
