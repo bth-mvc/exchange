@@ -1,3 +1,3 @@
 {$DOMAIN} {
-    reverse_proxy exchange:4000
+    reverse_proxy exchange:{$PORT}
 }

@@ -1,14 +1,15 @@
 # Driftsättning
 
-Exchange-servern körs som en Docker-container bakom Caddy (auto-TLS via Let's Encrypt) på en DigitalOcean-droplet. Ny kod deployas automatiskt när du pushar en `v*`-tagg till GitHub.
+Exchange-servern körs som en Docker-container bakom Caddy, med nginx som yttre reverse proxy (TLS via certbot). Ny kod deployas automatiskt när du pushar en `v*`-tagg till GitHub.
 
 Exchange är beroende av api-servern för nyckelverifiering — se till att api-servern är uppe och åtkomlig innan du startar exchange.
 
 ## Förutsättningar
 
-- DigitalOcean-konto
+- DigitalOcean-droplet (delas med api-server och övriga tjänster)
 - Domännamn med en A-record som pekar på dropletens IP (`exchange.example.com → <IP>`)
-- api-servern körs och är åtkomlig (på samma droplet eller separat)
+- nginx och certbot installerade på dropleten
+- api-servern körs och är åtkomlig
 - GitHub-repo med Actions aktiverat
 
 ---
@@ -18,11 +19,9 @@ Exchange är beroende av api-servern för nyckelverifiering — se till att api-
 På DigitalOcean:
 
 - **Image:** Ubuntu 24.04 LTS
-- **Size:** Basic, 1 GB RAM räcker gott
+- **Size:** Basic, 1 GB RAM (2 GB om dropleten delar med flera tjänster)
 - **Authentication:** SSH-nyckel (lägg till din publika nyckel)
 - Notera dropletens IP-adress
-
-> exchange och api-server kan köras på samma droplet om du vill minimera kostnaden. Ge dem då olika portar internt (4000 respektive 5000) och separata Caddy-subdomäner.
 
 ---
 
@@ -60,20 +59,25 @@ git clone https://github.com/bth-mvc/exchange.git .
 ### Miljövariabler
 
 ```bash
-cp .env.example .env
-nano .env
+cp .env.docker.example .env.docker
+nano .env.docker
 ```
 
 Fyll i:
 
 ```
-SERVICE_TOKEN=<samma värde som SERVICE_TOKEN i api-serverns .env>
+PORT=4000
+HTTP_PORT=8082
+HTTPS_PORT=8442
 API_KEY_SERVER_URL=https://api.example.com
-DOMAIN=exchange.example.com
+SERVICE_TOKEN=<samma värde som SERVICE_TOKEN i api-serverns .env>
+KEY_CACHE_TTL_MS=86400000
+DB_PATH=./data/exchange.db
 NODE_ENV=production
+DOMAIN=exchange.example.com
 ```
 
-Generera tokens med: `openssl rand -hex 32`
+Generera SERVICE_TOKEN med: `openssl rand -hex 32`
 
 ### Skapa datakatalogen
 
@@ -84,21 +88,55 @@ mkdir -p /opt/exchange/data
 ### Starta tjänsten
 
 ```bash
-docker compose up -d
+docker compose --env-file .env.docker up -d --build
 ```
 
-Caddy hämtar automatiskt ett TLS-certifikat från Let's Encrypt vid första uppstarten. Verifiera:
+---
+
+## 3. Konfigurera nginx
+
+Exchange Caddy lyssnar på `HTTP_PORT` (8082) internt. Nginx proxyas dit och hanterar TLS.
+
+Skapa `/etc/nginx/sites-available/exchange`:
+
+```nginx
+server {
+    server_name exchange.example.com;
+
+    location / {
+        proxy_pass http://localhost:8082;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection '';
+    }
+}
+```
+
+Aktivera och hämta TLS-certifikat:
+
+```bash
+ln -s /etc/nginx/sites-available/exchange /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
+certbot --nginx -d exchange.example.com
+```
+
+Verifiera:
 
 ```bash
 curl https://exchange.example.com/health
 # {"status":"ok","uptime":...}
 ```
 
+> SSE-endpoints (`/market/feed`) kräver att nginx inte buffrar svaret. Lägg till `proxy_buffering off;` i location-blocket om du märker problem med SSE.
+
 ---
 
-## 3. Konfigurera CD (GitHub Actions)
+## 4. Konfigurera CD (GitHub Actions)
 
-CD-pipelinen SSH:ar in på servern och kör `git pull && docker compose up -d --build` vid ny tagg.
+CD-pipelinen SSH:ar in på servern och kör `git pull && docker compose --env-file .env.docker up -d --build` vid ny tagg.
 
 ### Skapa SSH-nyckelpar för deploy
 
@@ -124,10 +162,10 @@ I repot: **Settings → Secrets and variables → Actions → New repository sec
 
 ---
 
-## 4. Deploya en ny version
+## 5. Deploya en ny version
 
 ```bash
-git tag v1.0.0
+git tag v1.0.1
 git push --tags
 ```
 
@@ -139,19 +177,19 @@ GitHub Actions kör `.github/workflows/deploy.yml` som SSH:ar in och startar om 
 
 ```bash
 # Visa körande containrar
-docker compose ps
+docker compose --env-file .env.docker ps
 
 # Visa loggar (följ)
-docker compose logs -f
+docker compose --env-file .env.docker logs -f
 
 # Starta om
-docker compose restart
+docker compose --env-file .env.docker restart
 
 # Uppdatera manuellt (utan CD)
-git pull && docker compose up -d --build
+git pull && docker compose --env-file .env.docker up -d --build
 
 # Stoppa allt
-docker compose down
+docker compose --env-file .env.docker down
 ```
 
 ## Säkerhetskopia av databasen
@@ -171,9 +209,9 @@ Schemalägg med cron:
 ## Nollställ databasen (ny kursomgång)
 
 ```bash
-docker compose down
+docker compose --env-file .env.docker down
 rm /opt/exchange/data/exchange.db
-docker compose up -d
+docker compose --env-file .env.docker up -d
 ```
 
 Alla studenters portföljer och handelshistorik raderas. Studenternas API-nycklar berörs inte (de lever i api-servern).
