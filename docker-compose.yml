@@ -6,7 +6,7 @@ services:
       - '${HTTPS_PORT:-443}:443'
       - '${HTTPS_PORT:-443}:443/udp'
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./${CADDYFILE:-Caddyfile}:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     environment:
