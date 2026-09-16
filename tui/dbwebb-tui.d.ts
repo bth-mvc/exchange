@@ -12,6 +12,7 @@ declare module '@dbwebb/tui' {
   export interface TuiShellOptions {
     welcomeMessage?: string
     defaultGroup?: string
+    historyFile?: string
   }
 
   export class TuiShell {

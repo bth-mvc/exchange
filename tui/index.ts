@@ -1,3 +1,5 @@
+import os from 'node:os'
+import path from 'node:path'
 import { CommandRegistry, TuiShell } from '@dbwebb/tui'
 import { ServerCommands } from './commands/server.js'
 import { MarketCommands } from './commands/market.js'
@@ -34,4 +36,5 @@ Tokenbörsen för MVC-kursen vid BTH.
     portfolio — show
     board     — show`,
   defaultGroup: 'market',
+  historyFile: path.join(os.homedir(), '.dbwtui', 'exchange_history'),
 }).start()
