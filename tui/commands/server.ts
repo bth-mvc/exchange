@@ -2,6 +2,7 @@ import { BaseCommand } from '@dbwebb/tui'
 
 interface HealthResponse {
   status: string
+  version: string
   uptime: number
 }
 
@@ -27,7 +28,7 @@ export class ServerCommands extends BaseCommand {
     const m = Math.floor((uptime % 3600) / 60)
     const s = uptime % 60
     const uptimeStr = h > 0 ? `${h}h ${m}m ${s}s` : m > 0 ? `${m}m ${s}s` : `${s}s`
-    return `Status: ${data.status}  Uptime: ${uptimeStr}`
+    return `Status: ${data.status}  Version: ${data.version}  Uptime: ${uptimeStr}`
   }
 
   async docs(): Promise<string> {
