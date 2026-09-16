@@ -46,6 +46,12 @@ export async function apiKeyAuth(req: Request, res: Response, next: NextFunction
       body: JSON.stringify({ apiKey }),
     })
 
+    if (!response.ok) {
+      logger.error({ status: response.status }, 'API key server returned an error')
+      res.status(401).json({ error: 'Invalid API key' })
+      return
+    }
+
     const result = (await response.json()) as { valid: boolean } & Partial<VerifiedStudent>
 
     if (!result.valid) {
@@ -63,7 +69,8 @@ export async function apiKeyAuth(req: Request, res: Response, next: NextFunction
     res.locals.student = student
     next()
   } catch (err) {
+    // Fail-closed: api-server unreachable and key not cached → treat as unauthorized (see CLAUDE.md).
     logger.error({ err }, 'API key server unreachable')
-    res.status(503).json({ error: 'Authentication service unavailable' })
+    res.status(401).json({ error: 'Invalid API key' })
   }
 }
