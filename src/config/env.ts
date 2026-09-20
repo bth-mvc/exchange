@@ -8,6 +8,10 @@ const schema = z.object({
   DEV_API_KEY: z.string().optional(),
   DB_PATH: z.string().default('./data/exchange.db'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  MARKET_MAKER_SWEEP_INTERVAL_MS: z.coerce.number().default(1000),
+  MARKET_MAKER_ACRONYM: z.string().min(1).default('claude'),
+  MARKET_MAKER_SPREAD_PCT: z.coerce.number().default(0.02),
+  MARKET_MAKER_QUOTE_AMOUNT: z.coerce.number().default(100),
 })
 
 export const env = schema.parse(process.env)
