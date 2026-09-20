@@ -1,0 +1,13 @@
+# Rök-test mot en riktig igångkörd exchange-server. Kör med:
+#   npm run tui -- --file tui/smoke.txt
+# (eller npm run tui:prod / tui:docker beroende på miljö)
+# Kräver EXCHANGE_URL/API_KEY satta (t.ex. via .env) mot en riktig nyckel.
+
+server health
+market assets
+market orderbook FIKA
+orders buy FIKA 5 11
+market orderbook FIKA
+trades list
+portfolio show
+board show

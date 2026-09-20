@@ -28,9 +28,9 @@ export class PortfolioCommands extends BaseCommand {
     this.req = makeClient(url, apiKey)
   }
 
-  async show(): Promise<string> {
+  async show() {
     const res = await this.req('GET', '/portfolio')
-    if (!res.ok) return `Error ${res.status}: ${await res.text()}`
+    if (!res.ok) return this.fail(`Error ${res.status}: ${await res.text()}`)
     const p = (await res.json()) as Portfolio
 
     const lines = [

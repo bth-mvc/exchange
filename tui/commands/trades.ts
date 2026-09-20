@@ -30,10 +30,10 @@ export class TradesCommands extends BaseCommand {
     this.req = makeClient(url, apiKey)
   }
 
-  async list(limitArg?: string): Promise<string> {
+  async list(limitArg?: string) {
     const limit = limitArg ? Math.min(parseInt(limitArg, 10), 100) : 10
     const res = await this.req('GET', `/trades?limit=${limit}`)
-    if (!res.ok) return `Error ${res.status}: ${await res.text()}`
+    if (!res.ok) return this.fail(`Error ${res.status}: ${await res.text()}`)
     const data = (await res.json()) as TradesResponse
 
     if (data.trades.length === 0) return 'Inga trades ännu.'

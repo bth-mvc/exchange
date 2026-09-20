@@ -34,9 +34,9 @@ export class MarketCommands extends BaseCommand {
     this.req = makeClient(url, apiKey)
   }
 
-  async assets(): Promise<string> {
+  async assets() {
     const res = await this.req('GET', '/assets')
-    if (!res.ok) return `Error ${res.status}: ${await res.text()}`
+    if (!res.ok) return this.fail(`Error ${res.status}: ${await res.text()}`)
     const tokens = (await res.json()) as Token[]
 
     const header = 'Token   Namn                Typ        Pris'
@@ -48,11 +48,11 @@ export class MarketCommands extends BaseCommand {
     return [header, sep, ...lines].join('\n')
   }
 
-  async orderbook(token: string): Promise<string> {
-    if (!token) return 'Usage: market orderbook <token>'
+  async orderbook(token: string) {
+    if (!token) return this.fail('Usage: market orderbook <token>')
     const res = await this.req('GET', `/assets/${token.toUpperCase()}/orderbook`)
-    if (res.status === 404) return `Token "${token.toUpperCase()}" finns inte.`
-    if (!res.ok) return `Error ${res.status}: ${await res.text()}`
+    if (res.status === 404) return this.fail(`Token "${token.toUpperCase()}" finns inte.`)
+    if (!res.ok) return this.fail(`Error ${res.status}: ${await res.text()}`)
     const ob = (await res.json()) as OrderBook
 
     const lines = [
@@ -66,7 +66,9 @@ export class MarketCommands extends BaseCommand {
     for (let i = 0; i < len; i++) {
       const bid = ob.bids[i]
       const ask = ob.asks[i]
-      const b = bid ? `${bid.price.toFixed(2).padStart(10)}  ${String(bid.amount).padStart(5)}` : ' '.repeat(18)
+      const b = bid
+        ? `${bid.price.toFixed(2).padStart(10)}  ${String(bid.amount).padStart(5)}`
+        : ' '.repeat(18)
       const a = ask ? `${ask.price.toFixed(2).padStart(10)}  ${String(ask.amount).padStart(5)}` : ''
       lines.push(`${b}         ${a}`)
     }

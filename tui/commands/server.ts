@@ -19,9 +19,9 @@ export class ServerCommands extends BaseCommand {
     this.url = (process.env.EXCHANGE_URL ?? 'http://localhost:4000').replace(/\/$/, '')
   }
 
-  async health(): Promise<string> {
+  async health() {
     const res = await fetch(`${this.url}/health`)
-    if (!res.ok) return `Error ${res.status}: ${await res.text()}`
+    if (!res.ok) return this.fail(`Error ${res.status}: ${await res.text()}`)
     const data = (await res.json()) as HealthResponse
     const uptime = Math.floor(data.uptime)
     const h = Math.floor(uptime / 3600)
