@@ -1,0 +1,137 @@
+import { db, ensureStudent } from '../db.js'
+import type { OrderRow } from '../db.js'
+import { nextId } from '../idGen.js'
+import { notifyOrderFilled } from '../webhook/notify.js'
+import { broadcast } from './simulator.js'
+import { setPrice } from './tokens.js'
+
+export interface PlaceOrderInput {
+  acronym: string
+  token: string
+  side: 'buy' | 'sell'
+  amount: number
+  price: number
+  userId?: string
+  webhookUrl?: string
+  webhookSecret?: string
+}
+
+function getOrder(id: string): OrderRow {
+  return db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as OrderRow
+}
+
+function insertOrder(id: string, input: PlaceOrderInput): OrderRow {
+  db.prepare(
+    `INSERT INTO orders (id, acronym, token, side, price, amount, remaining, status, user_id, webhook_url, webhook_secret)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)`,
+  ).run(
+    id,
+    input.acronym,
+    input.token,
+    input.side,
+    input.price,
+    input.amount,
+    input.amount,
+    input.userId ?? null,
+    input.webhookUrl ?? null,
+    input.webhookSecret ?? null,
+  )
+  return getOrder(id)
+}
+
+function findCrossingMaker(taker: OrderRow): OrderRow | undefined {
+  const makerSide = taker.side === 'buy' ? 'sell' : 'buy'
+  const priceCompare = taker.side === 'buy' ? '<=' : '>='
+  const orderBy = taker.side === 'buy' ? 'price ASC, rowid ASC' : 'price DESC, rowid ASC'
+
+  return db
+    .prepare(
+      `SELECT * FROM orders
+       WHERE token = ? AND side = ? AND status = 'open' AND remaining > 0
+         AND acronym != ? AND price ${priceCompare} ?
+       ORDER BY ${orderBy}
+       LIMIT 1`,
+    )
+    .get(taker.token, makerSide, taker.acronym, taker.price) as OrderRow | undefined
+}
+
+/** Settles one party's side of a fill: trade row, holdings/balance, order remaining, webhook. */
+export function settleFill(
+  order: OrderRow,
+  amount: number,
+  price: number,
+  timestamp: string,
+): void {
+  const total = amount * price
+  ensureStudent(order.acronym)
+
+  const tradeId = nextId('trade')
+  db.prepare(
+    `INSERT INTO trades (id, acronym, token, side, amount, price, total, timestamp)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(tradeId, order.acronym, order.token, order.side, amount, price, total, timestamp)
+
+  if (order.side === 'buy') {
+    db.prepare(
+      `INSERT INTO holdings (acronym, token, amount) VALUES (?, ?, ?)
+       ON CONFLICT(acronym, token) DO UPDATE SET amount = amount + excluded.amount`,
+    ).run(order.acronym, order.token, amount)
+    db.prepare(`UPDATE students SET balance = balance - ? WHERE acronym = ?`).run(
+      total,
+      order.acronym,
+    )
+  } else {
+    db.prepare(
+      `INSERT INTO holdings (acronym, token, amount) VALUES (?, ?, 0)
+       ON CONFLICT(acronym, token) DO UPDATE SET amount = MAX(0, amount - ?)`,
+    ).run(order.acronym, order.token, amount)
+    db.prepare(`UPDATE students SET balance = balance + ? WHERE acronym = ?`).run(
+      total,
+      order.acronym,
+    )
+  }
+
+  const remaining = order.remaining - amount
+  const status = remaining <= 0 ? 'filled' : 'open'
+  db.prepare(`UPDATE orders SET remaining = ?, status = ? WHERE id = ?`).run(
+    remaining,
+    status,
+    order.id,
+  )
+  order.remaining = remaining
+  order.status = status
+
+  notifyOrderFilled(order, amount, price, timestamp)
+}
+
+/** Inserts an order and matches it against the resting book on price/time priority. */
+export function placeAndMatch(id: string, input: PlaceOrderInput): void {
+  const run = db.transaction(() => {
+    let taker = insertOrder(id, input)
+
+    while (taker.remaining > 0) {
+      const maker = findCrossingMaker(taker)
+      if (!maker) break
+
+      const fillAmount = Math.min(taker.remaining, maker.remaining)
+      const fillPrice = maker.price
+      const timestamp = new Date().toISOString()
+
+      settleFill(maker, fillAmount, fillPrice, timestamp)
+      settleFill(taker, fillAmount, fillPrice, timestamp)
+      setPrice(taker.token, fillPrice)
+      broadcast('trade', {
+        token: taker.token,
+        side: taker.side,
+        amount: fillAmount,
+        price: fillPrice,
+        total: fillAmount * fillPrice,
+        timestamp,
+      })
+
+      taker = getOrder(taker.id)
+    }
+  })
+
+  run()
+}

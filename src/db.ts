@@ -35,6 +35,23 @@ db.exec(`
     total     REAL NOT NULL,
     timestamp TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS orders (
+    id             TEXT PRIMARY KEY,
+    acronym        TEXT NOT NULL,
+    token          TEXT NOT NULL,
+    side           TEXT NOT NULL CHECK (side IN ('buy', 'sell')),
+    price          REAL NOT NULL,
+    amount         INTEGER NOT NULL,
+    remaining      INTEGER NOT NULL,
+    status         TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'filled')),
+    user_id        TEXT,
+    webhook_url    TEXT,
+    webhook_secret TEXT,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_orders_match ON orders (token, side, status, price);
 `)
 
 export interface StudentRow {
@@ -58,6 +75,21 @@ export interface TradeRow {
   price: number
   total: number
   timestamp: string
+}
+
+export interface OrderRow {
+  id: string
+  acronym: string
+  token: string
+  side: string
+  price: number
+  amount: number
+  remaining: number
+  status: string
+  user_id: string | null
+  webhook_url: string | null
+  webhook_secret: string | null
+  created_at: string
 }
 
 export function ensureStudent(acronym: string): void {

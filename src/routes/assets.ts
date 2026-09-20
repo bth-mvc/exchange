@@ -1,7 +1,25 @@
 import { Router } from 'express'
+import { db } from '../db.js'
 import { tokens, getToken } from '../market/tokens.js'
 
 export const assetsRouter = Router()
+
+interface BookLevel {
+  price: number
+  amount: number
+}
+
+function bookSide(token: string, side: 'buy' | 'sell', order: 'ASC' | 'DESC'): BookLevel[] {
+  return db
+    .prepare(
+      `SELECT price, SUM(remaining) AS amount FROM orders
+       WHERE token = ? AND side = ? AND status = 'open' AND remaining > 0
+       GROUP BY price
+       ORDER BY price ${order}
+       LIMIT 10`,
+    )
+    .all(token, side) as BookLevel[]
+}
 
 assetsRouter.get('/', (_req, res) => {
   res.json(tokens)
@@ -13,18 +31,10 @@ assetsRouter.get('/:id/orderbook', (req, res) => {
     res.status(404).json({ error: 'Token not found' })
     return
   }
-  const base = token.price
+
   res.json({
     token: token.id,
-    bids: [
-      { price: +(base * 0.98).toFixed(2), amount: 5, side: 'buy' },
-      { price: +(base * 0.95).toFixed(2), amount: 12, side: 'buy' },
-      { price: +(base * 0.9).toFixed(2), amount: 25, side: 'buy' },
-    ],
-    asks: [
-      { price: +(base * 1.02).toFixed(2), amount: 8, side: 'sell' },
-      { price: +(base * 1.05).toFixed(2), amount: 15, side: 'sell' },
-      { price: +(base * 1.1).toFixed(2), amount: 20, side: 'sell' },
-    ],
+    bids: bookSide(token.id, 'buy', 'DESC').map((level) => ({ ...level, side: 'buy' })),
+    asks: bookSide(token.id, 'sell', 'ASC').map((level) => ({ ...level, side: 'sell' })),
   })
 })

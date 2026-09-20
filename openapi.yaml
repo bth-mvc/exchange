@@ -93,7 +93,10 @@ paths:
                   example: user-123
       responses:
         '201':
-          description: Order lagd (fylls inom 1 sekund)
+          description: >-
+            Order lagd. Matchas direkt mot motpart om möjligt (helt eller
+            delvis), annars ligger den öppen i orderboken tills en motpart
+            eller likviditetsbotten fyller den.
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':

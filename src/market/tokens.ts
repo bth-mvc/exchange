@@ -21,3 +21,10 @@ export function getToken(id: string): Token | undefined {
 export function currentPrice(tokenId: string): number {
   return getToken(tokenId)?.price ?? 0
 }
+
+export function setPrice(tokenId: string, price: number): void {
+  const token = getToken(tokenId)
+  if (token) {
+    token.price = price
+  }
+}

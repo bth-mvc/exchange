@@ -1,9 +1,8 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { db, ensureStudent } from '../db.js'
+import { nextId } from '../idGen.js'
+import { placeAndMatch } from '../market/matching.js'
 import { getToken } from '../market/tokens.js'
-import { broadcast } from '../market/simulator.js'
-import { sendWebhook } from '../webhook/sender.js'
 
 export const ordersRouter = Router()
 
@@ -34,43 +33,19 @@ ordersRouter.post('/', (req, res) => {
     webhookSecret: string
   }
 
-  const orderId = `order-${Date.now()}`
+  const orderId = nextId('order')
   res.status(201).json({ id: orderId, token, side, amount, price, status: 'open' })
 
-  setTimeout(() => {
-    const total = amount * price
-    const tradeId = `trade-${Date.now()}`
-    const timestamp = new Date().toISOString()
-
-    ensureStudent(acronym)
-
-    db.prepare(
-      `INSERT INTO trades (id, acronym, token, side, amount, price, total, timestamp)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(tradeId, acronym, token, side, amount, price, total, timestamp)
-
-    if (side === 'buy') {
-      db.prepare(
-        `INSERT INTO holdings (acronym, token, amount) VALUES (?, ?, ?)
-         ON CONFLICT(acronym, token) DO UPDATE SET amount = amount + excluded.amount`,
-      ).run(acronym, token, amount)
-      db.prepare(`UPDATE students SET balance = balance - ? WHERE acronym = ?`).run(total, acronym)
-    } else {
-      db.prepare(
-        `INSERT INTO holdings (acronym, token, amount) VALUES (?, ?, 0)
-         ON CONFLICT(acronym, token) DO UPDATE SET amount = MAX(0, amount - ?)`,
-      ).run(acronym, token, amount)
-      db.prepare(`UPDATE students SET balance = balance + ? WHERE acronym = ?`).run(total, acronym)
-    }
-
-    broadcast('trade', { token, side, amount, price, total, timestamp })
-
-    const payload = {
-      id: `wh-${Date.now()}`,
-      event: 'order.filled',
-      data: { orderId, ...(userId && { userId }), token, side, amount, price, total },
-      timestamp,
-    }
-    sendWebhook(webhookUrl, webhookSecret, payload)
-  }, 1000)
+  setImmediate(() => {
+    placeAndMatch(orderId, {
+      acronym,
+      token,
+      side,
+      amount,
+      price,
+      userId,
+      webhookUrl,
+      webhookSecret,
+    })
+  })
 })
