@@ -123,29 +123,43 @@ Efter att `deploy.yml` kört en gång (så paketet finns): **GitHub → bth-mvc 
 
 Om deploy-jobbet misslyckas med `error from registry: unauthorized` vid `docker compose pull`: paketet är fortfarande privat.
 
-### Skapa SSH-nyckelpar för deploy
+### Skapa deploy-användare och SSH-nyckelpar
 
-GitHub Actions behöver kunna SSH:a in på servern. Eftersom exchange delar droplet med api-server kan du antingen återanvända samma privata nyckel som secret här också (samma `SSH_USER`/`SSH_HOST` som api-server-repot redan har), eller generera en egen:
-
-```bash
-ssh-keygen -t ed25519 -C "github-actions-deploy-exchange" -f ~/.ssh/deploy_key_exchange -N ""
-```
-
-Lägg till **publika** nyckeln på servern:
+GitHub Actions loggar inte in som root. Skapa en egen användare för appen, som äger `/opt/exchange` och får köra `docker` (kör som root på droppen):
 
 ```bash
-cat ~/.ssh/deploy_key_exchange.pub >> /root/.ssh/authorized_keys
+useradd --system --create-home --shell /bin/bash --user-group exchange
+usermod -aG docker exchange
+find /opt/exchange -path /opt/exchange/data -prune -o -exec chown exchange:exchange {} +
 ```
+
+`data/` lämnas med root som ägare eftersom containern skriver dit som root. Observera att gruppen `docker` i praktiken ger root-rättigheter, så nyckeln ska bara finnas som GitHub Secret.
+
+Generera ett nyckelpar (på din egen dator) med en egen nyckel för just den här appen:
+
+```bash
+ssh-keygen -t ed25519 -C "github-actions-deploy-exchange" -f ./deploy_key_exchange -N ""
+```
+
+Lägg den **publika** nyckeln hos deploy-användaren. `restrict` stänger av portvidarebefordran, agent och pty:
+
+```bash
+install -d -m 700 -o exchange -g exchange /home/exchange/.ssh
+echo "restrict $(cat deploy_key_exchange.pub)" > /home/exchange/.ssh/authorized_keys
+chown exchange:exchange /home/exchange/.ssh/authorized_keys && chmod 600 /home/exchange/.ssh/authorized_keys
+```
+
+Lägg den **privata** nyckeln (hela innehållet i `deploy_key_exchange`) som GitHub Secret `SSH_PRIVATE_KEY`, och radera sedan nyckelfilerna lokalt.
 
 ### Lägg till GitHub Secrets
 
-I repot: **Settings → Secrets and variables → Actions → New repository secret**
+I repot: **Settings → Secrets and variables → Actions → New repository secret**, eller med `gh secret set`.
 
 | Secret | Värde |
 |---|---|
-| `SSH_HOST` | Dropletens IP-adress |
-| `SSH_USER` | `root` (eller din deploy-användare) |
-| `SSH_PRIVATE_KEY` | Innehållet i `~/.ssh/deploy_key` (privata nyckeln) |
+| `SSH_HOST` | Dropletens IP-adress eller domännamn |
+| `SSH_USER` | `exchange` (deploy-användaren ovan, inte `root`) |
+| `SSH_PRIVATE_KEY` | Innehållet i `deploy_key_exchange` (privata nyckeln) |
 
 ---
 
