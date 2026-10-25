@@ -12,6 +12,7 @@ import { tradesRouter } from './routes/trades.js'
 import { portfolioRouter } from './routes/portfolio.js'
 import { leaderboardRouter } from './routes/leaderboard.js'
 import { marketRouter } from './routes/market.js'
+import { webhooksRouter } from './routes/webhooks.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const spec = parse(readFileSync(join(__dirname, '..', 'openapi.yaml'), 'utf8'))
@@ -41,6 +42,7 @@ app.use('/trades', tradesRouter)
 app.use('/portfolio', portfolioRouter)
 app.use('/leaderboard', leaderboardRouter)
 app.use('/market', marketRouter)
+app.use('/webhooks', webhooksRouter)
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' })

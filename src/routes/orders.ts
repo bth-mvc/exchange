@@ -27,11 +27,7 @@ ordersRouter.post('/', (req, res) => {
     return
   }
 
-  const { acronym, webhookUrl, webhookSecret } = res.locals.student as {
-    acronym: string
-    webhookUrl: string
-    webhookSecret: string
-  }
+  const { acronym } = res.locals.student as { acronym: string }
 
   const shortfall = insufficientFunds(acronym, token, side, amount, price)
   if (shortfall) {
@@ -41,7 +37,7 @@ ordersRouter.post('/', (req, res) => {
 
   // Insert now, so the next order already sees this one's reservation; match after the response.
   const orderId = nextId('order')
-  insertOrder(orderId, { acronym, token, side, amount, price, userId, webhookUrl, webhookSecret })
+  insertOrder(orderId, { acronym, token, side, amount, price, userId })
   res.status(201).json({ id: orderId, token, side, amount, price, status: 'open' })
 
   setImmediate(() => matchOrder(orderId))

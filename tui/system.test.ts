@@ -3,16 +3,12 @@ import type { Server } from 'node:http'
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
 import { db } from '../src/db.js'
 
-vi.mock('../src/webhook/sender.js', () => ({ sendWebhook: vi.fn() }))
-
 // Mock apiKeyAuth so the test server doesn't call the real api-server — same
 // pattern as src/routes/exchange.test.ts, just imported from tui/'s location.
 vi.mock('../src/middleware/apiKeyAuth.js', () => ({
   apiKeyAuth: vi.fn((_req, res, next) => {
     res.locals.student = {
       acronym: 'tst',
-      webhookUrl: 'http://localhost:9999/wh',
-      webhookSecret: 'test-secret-16-chars',
     }
     next()
   }),
@@ -28,8 +24,6 @@ async function mockStudent(acronym: string) {
   vi.mocked(apiKeyAuth).mockImplementationOnce(async (_req, res, next) => {
     res.locals.student = {
       acronym,
-      webhookUrl: 'http://localhost:9999/wh',
-      webhookSecret: 'test-secret-16-chars',
     }
     next()
   })

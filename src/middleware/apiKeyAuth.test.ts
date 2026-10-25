@@ -34,8 +34,6 @@ describe('apiKeyAuth', () => {
         JSON.stringify({
           valid: true,
           acronym: 'qp1',
-          webhookUrl: 'http://localhost/wh',
-          webhookSecret: 'secret',
         }),
         { status: 200 },
       ),
@@ -51,8 +49,6 @@ describe('apiKeyAuth', () => {
         JSON.stringify({
           valid: true,
           acronym: 'abc',
-          webhookUrl: 'http://localhost/wh',
-          webhookSecret: 'secret',
         }),
         { status: 200 },
       ),

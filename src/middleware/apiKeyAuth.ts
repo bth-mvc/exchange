@@ -4,8 +4,6 @@ import { logger } from '../logger.js'
 
 interface VerifiedStudent {
   acronym: string
-  webhookUrl: string
-  webhookSecret: string
 }
 
 interface CacheEntry {
@@ -24,7 +22,7 @@ export async function apiKeyAuth(req: Request, res: Response, next: NextFunction
   }
 
   if (env.NODE_ENV === 'development' && env.DEV_API_KEY && apiKey === env.DEV_API_KEY) {
-    res.locals.student = { acronym: 'dev', webhookUrl: '', webhookSecret: 'dev-secret' }
+    res.locals.student = { acronym: 'dev' }
     next()
     return
   }
@@ -59,11 +57,7 @@ export async function apiKeyAuth(req: Request, res: Response, next: NextFunction
       return
     }
 
-    const student: VerifiedStudent = {
-      acronym: result.acronym!,
-      webhookUrl: result.webhookUrl!,
-      webhookSecret: result.webhookSecret!,
-    }
+    const student: VerifiedStudent = { acronym: result.acronym! }
 
     cache.set(apiKey, { data: student, expiresAt: Date.now() + env.KEY_CACHE_TTL_MS })
     res.locals.student = student

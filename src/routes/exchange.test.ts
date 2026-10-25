@@ -1,10 +1,9 @@
 import type { Response } from 'express'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import request from 'supertest'
+import { createHmac } from 'node:crypto'
 import { db } from '../db.js'
 import type { OrderRow, TradeRow } from '../db.js'
-
-vi.mock('../webhook/sender.js', () => ({ sendWebhook: vi.fn() }))
 
 function flush() {
   return new Promise((resolve) => setImmediate(resolve))
@@ -27,11 +26,11 @@ function giveTokens(acronym: string, amount = 100) {
   }
 }
 
-async function mockStudent(acronym: string, webhookSecret = 'test-secret-16-chars') {
+async function mockStudent(acronym: string) {
   giveTokens(acronym)
   const { apiKeyAuth } = await import('../middleware/apiKeyAuth.js')
   vi.mocked(apiKeyAuth).mockImplementationOnce(async (_req, res, next) => {
-    res.locals.student = { acronym, webhookUrl: 'http://localhost:9999/wh', webhookSecret }
+    res.locals.student = { acronym }
     next()
   })
 }
@@ -39,11 +38,7 @@ async function mockStudent(acronym: string, webhookSecret = 'test-secret-16-char
 // Mock apiKeyAuth so tests don't call the real api-server
 vi.mock('../middleware/apiKeyAuth.js', () => ({
   apiKeyAuth: vi.fn((_req, res, next) => {
-    res.locals.student = {
-      acronym: 'tst',
-      webhookUrl: 'http://localhost:9999/wh',
-      webhookSecret: 'test-secret-16-chars',
-    }
+    res.locals.student = { acronym: 'tst' }
     next()
   }),
 }))
@@ -56,8 +51,7 @@ beforeEach(async () => {
   db.prepare('DELETE FROM trades').run()
   db.prepare('DELETE FROM holdings').run()
   db.prepare('DELETE FROM students').run()
-  const { sendWebhook } = await import('../webhook/sender.js')
-  vi.mocked(sendWebhook).mockClear()
+  db.prepare('DELETE FROM webhooks').run()
 })
 
 describe('GET /assets', () => {
@@ -284,9 +278,7 @@ describe('POST /orders — matching', () => {
     expect(cccTrades.map((t) => t.amount).sort((a, b) => a - b)).toEqual([10, 15])
   })
 
-  it('sends one webhook per fill with a stable orderId and userId passthrough', async () => {
-    const { sendWebhook } = await import('../webhook/sender.js')
-
+  it('queues one webhook per fill with a stable orderId and userId passthrough', async () => {
     await mockStudent('mkr')
     await request(app).post('/orders').set('X-Api-Key', 'm').send({
       token: 'FIKA',
@@ -317,9 +309,9 @@ describe('POST /orders — matching', () => {
       event: string
       data: { orderId: string; userId?: string; amount: number }
     }
-    const takerWebhooks = vi
-      .mocked(sendWebhook)
-      .mock.calls.map(([, , payload]) => payload as unknown as WebhookPayload)
+    const rows = db.prepare('SELECT body FROM webhooks').all() as { body: string }[]
+    const takerWebhooks = rows
+      .map((row) => JSON.parse(row.body) as WebhookPayload)
       .filter((payload) => payload.data.orderId === takerId)
 
     expect(takerWebhooks).toHaveLength(2)
@@ -384,6 +376,90 @@ describe('POST /orders — matching', () => {
     await flush()
 
     expect(getToken('SUDO')?.price).toBe(27.5)
+  })
+})
+
+describe('webhooks', () => {
+  async function fill() {
+    await mockStudent('whs')
+    await request(app).post('/orders').set('X-Api-Key', 's').send({
+      token: 'FIKA',
+      side: 'sell',
+      amount: 2,
+      price: 10.0,
+    })
+    await request(app).post('/orders').set('X-Api-Key', 'any').send({
+      token: 'FIKA',
+      side: 'buy',
+      amount: 2,
+      price: 10.0,
+    })
+    await flush()
+  }
+
+  it('gives each student a webhook secret of their own', async () => {
+    const res = await request(app).get('/webhooks/secret').set('X-Api-Key', 'any')
+    expect(res.status).toBe(200)
+    expect(res.body.secret).toMatch(/^whsec_[0-9a-f]{48}$/)
+
+    await mockStudent('other')
+    const other = await request(app).get('/webhooks/secret').set('X-Api-Key', 'o')
+    expect(other.body.secret).not.toBe(res.body.secret)
+  })
+
+  it('returns pending webhooks signed with the student secret', async () => {
+    await fill()
+    const secret = (await request(app).get('/webhooks/secret').set('X-Api-Key', 'any')).body
+      .secret as string
+
+    const res = await request(app).get('/webhooks/pending').set('X-Api-Key', 'any')
+    expect(res.status).toBe(200)
+    expect(res.body.webhooks).toHaveLength(1)
+
+    const [webhook] = res.body.webhooks as { id: string; body: string; signature: string }[]
+    const expected = `sha256=${createHmac('sha256', secret).update(webhook.body).digest('hex')}`
+    expect(webhook.signature).toBe(expected)
+    expect(JSON.parse(webhook.body)).toMatchObject({
+      id: webhook.id,
+      event: 'order.filled',
+      data: { token: 'FIKA', side: 'buy', amount: 2, price: 10, total: 20 },
+    })
+  })
+
+  it('keeps a webhook pending until it is acked', async () => {
+    await fill()
+    const first = await request(app).get('/webhooks/pending').set('X-Api-Key', 'any')
+    const again = await request(app).get('/webhooks/pending').set('X-Api-Key', 'any')
+    expect(again.body.webhooks).toEqual(first.body.webhooks)
+
+    const ids = (first.body.webhooks as { id: string }[]).map((w) => w.id)
+    const ack = await request(app)
+      .post('/webhooks/pending/ack')
+      .set('X-Api-Key', 'any')
+      .send({ ids })
+    expect(ack.body).toEqual({ acked: 1 })
+
+    const after = await request(app).get('/webhooks/pending').set('X-Api-Key', 'any')
+    expect(after.body.webhooks).toEqual([])
+  })
+
+  it('does not let a student see or ack another student’s webhooks', async () => {
+    await fill()
+    const mine = await request(app).get('/webhooks/pending').set('X-Api-Key', 'any')
+    const ids = (mine.body.webhooks as { id: string }[]).map((w) => w.id)
+
+    await mockStudent('nosy')
+    const ack = await request(app).post('/webhooks/pending/ack').set('X-Api-Key', 'n').send({ ids })
+    expect(ack.body).toEqual({ acked: 0 })
+
+    await mockStudent('nosy')
+    const theirs = await request(app).get('/webhooks/pending').set('X-Api-Key', 'n')
+    expect(theirs.body.webhooks).toEqual([])
+  })
+
+  it('returns 400 for an ack without ids', async () => {
+    const res = await request(app).post('/webhooks/pending/ack').set('X-Api-Key', 'any').send({})
+    expect(res.status).toBe(400)
   })
 })
 

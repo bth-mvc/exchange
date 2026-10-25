@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import { randomBytes } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { env } from './config/env.js'
@@ -15,6 +16,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS students (
     acronym    TEXT PRIMARY KEY,
     balance    REAL NOT NULL DEFAULT 10000,
+    webhook_secret TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -52,11 +54,29 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_orders_match ON orders (token, side, status, price);
+
+  CREATE TABLE IF NOT EXISTS webhooks (
+    id         TEXT PRIMARY KEY,
+    acronym    TEXT NOT NULL,
+    body       TEXT NOT NULL,
+    signature  TEXT NOT NULL,
+    acked_at   TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_webhooks_pending ON webhooks (acronym, acked_at);
 `)
+
+// Databases from before webhook secrets: add the column; ensureStudent fills it in.
+const studentColumns = db.prepare(`PRAGMA table_info(students)`).all() as { name: string }[]
+if (!studentColumns.some((c) => c.name === 'webhook_secret')) {
+  db.exec(`ALTER TABLE students ADD COLUMN webhook_secret TEXT`)
+}
 
 export interface StudentRow {
   acronym: string
   balance: number
+  webhook_secret: string
   created_at: string
 }
 
@@ -92,6 +112,17 @@ export interface OrderRow {
   created_at: string
 }
 
+function newWebhookSecret(): string {
+  return `whsec_${randomBytes(24).toString('hex')}`
+}
+
+/** Creates the student on first use, with a webhook secret of their own. */
 export function ensureStudent(acronym: string): void {
-  db.prepare(`INSERT OR IGNORE INTO students (acronym) VALUES (?)`).run(acronym)
+  db.prepare(`INSERT OR IGNORE INTO students (acronym, webhook_secret) VALUES (?, ?)`).run(
+    acronym,
+    newWebhookSecret(),
+  )
+  db.prepare(
+    `UPDATE students SET webhook_secret = ? WHERE acronym = ? AND webhook_secret IS NULL`,
+  ).run(newWebhookSecret(), acronym)
 }

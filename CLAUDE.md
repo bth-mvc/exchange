@@ -40,6 +40,9 @@ X-Api-Key: <api-key>
 | `GET` | `/trades` | Handelshistorik med cursor-paginering |
 | `GET` | `/portfolio` | Studentens portfölj på börsen |
 | `GET` | `/leaderboard` | Rankningslista för alla användare |
+| `GET` | `/webhooks/pending` | Okvitterade webhooks (polling) |
+| `POST` | `/webhooks/pending/ack` | Kvittera hanterade webhooks |
+| `GET` | `/webhooks/secret` | Studentens webhook-hemlighet |
 
 #### `POST /orders` — request body
 ```json
@@ -77,11 +80,19 @@ GET /trades?limit=20&cursor=trade-abc123
 
 ### HMAC-webhooks
 
-När en order matchas skickar exchange en POST till studentservern:
+När en studentorder fylls (helt eller delvis) lägger exchange en signerad webhook i en kö
+per student (tabellen `webhooks`). **Exchange pushar ingenting** — studentens server kör
+oftast på `localhost` och går inte att nå från internet — utan studenten pollar:
 
-**URL:** konfigureras via `WEBHOOK_URL` (studentens registrerade URL)
-**Header:** `X-Webhook-Signature: sha256=<hmac-hex>`
-**Secret:** `WEBHOOK_SECRET` (delad hemlighet per student)
+- `GET /webhooks/pending?limit=50` → `{ webhooks: [{ id, body, signature }] }`, okvitterade, äldst först
+- `POST /webhooks/pending/ack` `{ ids: [...] }` → `{ acked: n }`; en post returneras tills den kvitterats
+- `GET /webhooks/secret` → `{ secret: "whsec_..." }`
+
+**Signatur:** `sha256=<hmac-hex>` av exakt `body`-strängen — samma värde som headern
+`X-Webhook-Signature` har när mock-servern pushar.
+**Secret:** skapas av exchange per student (`students.webhook_secret`) första gången
+studenten används. Api-servern har inget med webhooks att göra.
+Marknadsmakarens fyllnader köas inte. Kvitterade poster rensas efter 7 dagar.
 
 **Webhook-payload:**
 ```json
@@ -142,14 +153,14 @@ Exchange-servern är skriven i **Node.js/Express** (JavaScript, ESM). Avsiktligt
 
 ## Nyckelverifiering mot api-servern
 
-Exchange verifierar studenters API-nycklar mot `bth-mvc/api-server` via `POST /service/verify`. Svaret innehåller `webhookUrl` och `webhookSecret` per student — exchange behöver dessa för att skicka webhooks vid matchade ordrar.
+Exchange verifierar studenters API-nycklar mot `bth-mvc/api-server` via `POST /service/verify`. Svaret innehåller bara `acronym`; webhook-hemligheten ägs av exchange (se HMAC-webhooks ovan).
 
 ### Verifieringsflöde
 
 ```
 Student → POST /orders (X-Api-Key: mvc_xxx)
 Exchange → POST api-server/service/verify { apiKey: "mvc_xxx" }
-Api-server → { valid: true, acronym: "abc", webhookUrl: "...", webhookSecret: "..." }
+Api-server → { valid: true, acronym: "abc" }
 Exchange → cachat i minnet, svarar studenten
 ```
 

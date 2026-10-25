@@ -159,6 +159,64 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /webhooks/secret:
+    get:
+      tags: [webhooks]
+      summary: Studentens webhook-hemlighet
+      description: |
+        Den delade hemligheten som varje webhook signeras med (HMAC-SHA256).
+        Skapas första gången studenten används och ändras inte.
+      responses:
+        '200':
+          description: '{ "secret": "whsec_..." }'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /webhooks/pending:
+    get:
+      tags: [webhooks]
+      summary: Webhooks som inte är kvitterade, äldst först
+      description: |
+        Börsen pushar inga webhooks; studentens server pollar här. Varje post har
+        `body` (exakt den sträng som signerats), `signature` (`sha256=<hex>`, samma
+        värde som headern `X-Webhook-Signature` vid push) och `id`. En post
+        returneras tills den kvitterats med POST /webhooks/pending/ack.
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 100 }
+      responses:
+        '200':
+          description: '{ "webhooks": [{ "id": "wh-...", "body": "{...}", "signature": "sha256=..." }] }'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /webhooks/pending/ack:
+    post:
+      tags: [webhooks]
+      summary: Kvittera hanterade webhooks
+      description: Okända id:n och andra studenters id:n ignoreras.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  items: { type: string }
+                  minItems: 1
+                  maxItems: 100
+      responses:
+        '200':
+          description: '{ "acked": <antal> }'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     apiKey:

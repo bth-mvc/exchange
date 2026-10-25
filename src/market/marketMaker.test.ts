@@ -1,13 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { db } from '../db.js'
 import type { OrderRow, TradeRow } from '../db.js'
 import { env } from '../config/env.js'
 
-vi.mock('../webhook/sender.js', () => ({ sendWebhook: vi.fn() }))
-
 const { placeAndMatch } = await import('./matching.js')
 const { runMarketMakerSweep } = await import('./marketMaker.js')
-const { sendWebhook } = await import('../webhook/sender.js')
 
 const MM = env.MARKET_MAKER_ACRONYM
 
@@ -22,7 +19,7 @@ beforeEach(() => {
   db.prepare('DELETE FROM trades').run()
   db.prepare('DELETE FROM holdings').run()
   db.prepare('DELETE FROM students').run()
-  vi.mocked(sendWebhook).mockClear()
+  db.prepare('DELETE FROM webhooks').run()
 })
 
 describe('runMarketMakerSweep', () => {
@@ -78,8 +75,6 @@ describe('runMarketMakerSweep', () => {
       side: 'buy',
       amount: 5,
       price: mmSell.price,
-      webhookUrl: 'http://localhost:9999/wh',
-      webhookSecret: 'secret',
     })
 
     const order = db.prepare('SELECT * FROM orders WHERE id = ?').get('order-cross') as OrderRow
@@ -87,7 +82,8 @@ describe('runMarketMakerSweep', () => {
 
     const trades = db.prepare('SELECT * FROM trades WHERE acronym = ?').all(MM) as TradeRow[]
     expect(trades).toHaveLength(1)
-    expect(sendWebhook).toHaveBeenCalledTimes(1)
+    // Only the student gets a webhook, not the market maker.
+    expect(db.prepare('SELECT acronym FROM webhooks').all()).toEqual([{ acronym: 'aaa' }])
   })
 
   it('opportunistically crosses a favorably priced resting order when requoting', () => {
@@ -97,8 +93,6 @@ describe('runMarketMakerSweep', () => {
       side: 'sell',
       amount: 5,
       price: 5.0,
-      webhookUrl: 'http://localhost:9999/wh',
-      webhookSecret: 'secret',
     })
 
     runMarketMakerSweep()

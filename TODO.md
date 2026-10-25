@@ -33,57 +33,10 @@ Mina egna anteckningar.
             garantera att varje order löses inom en avgränsad, förutsägbar tid (via
             likviditetsbotten ovan) så att automatiserade dry-runs inte hänger sig.
 
-          **Beroende — webhook-leverans på live är trasig oavsett:** `src/webhook/sender.ts`
-          gör bara en ren `fetch()` mot studentens `webhookUrl`, ingen retry, och det finns ingen
-          `/webhooks/pending`-polling-endpoint trots att den är dokumenterad i teacher-repots
-          `docs/EXCHANGE.md` och planerad i `kmom05.mdx` ("beslutad strategi 2026-06-22"). Utan
-          att den delen löses spelar det ingen roll hur bra matchningen blir — webhooken når
-          aldrig studentens server på live utan att studenten kör ngrok själv. Bör lösas i samma
-          omgång eftersom båda rör samma kodväg (`sendWebhook`-anropet i `orders.ts`).
-
-          **Rotorsak (grävd fram 2026-09-18):** `apiKeyAuth.ts` hämtar `webhookUrl`/
-          `webhookSecret` från api-nyckelserverns `POST /service/verify`-svar (non-null-assertat),
-          men `api-server/src/routes/service.ts`s `/verify` returnerar bara `{valid, acronym}` —
-          `keys`-tabellen har inga webhook-kolumner alls. `webhookUrl` blir alltså `undefined` för
-          varje riktig student, `fetch(undefined, ...)` kastar, felet fångas tyst i sändarens
-          try/catch och loggas bara som "Webhook delivery failed". Mock-servern döljer detta helt
-          eftersom den hårdkodar `localhost:3000` istället för att läsa en registrerad URL.
-
-          **Uppdatering (grävt i `teacher`-repot 2026-09-19): det är redan "beslutat" på pappret,
-          bara aldrig byggt — och beslutet är dessutom inkonsekvent dokumenterat.** `kmom05.mdx`
-          (rad ~163–175, rubrik "Webhook-leverans — beslutad strategi (2026-06-22)") säger:
-          kombination av push (mock, lokalt) + **polling (`GET /webhooks/pending`) på live**.
-          `docs/EXCHANGE.md` (rad ~70, studentens egen referens) upprepar samma sak rakt av. Så
-          studenterna är redan lovade den endpointen. Men: den finns inte i den här repot (se
-          rotorsak nedan), och en dry-run-anteckning i `teacher/teacher/memory/claude/
-          project_kmom01_dryrun_fixes.md` (post 39) bekräftar att en riktig student redan fått 404
-          på `GET /webhooks/pending` mot live av det skälet. **Dessutom** har `teacher/issues/
-          06-50-go-live.md` (rad ~227–241) fortfarande ett eget `OPEN — NEEDS RESOLUTION`-
-          kommentarblock som listar samma tre alternativ och säger "Decision needed: which
-          approach?" och "**Not implemented in solution**" — som om 2026-06-22-beslutet i
-          `kmom05.mdx` aldrig nådde den filen. Den motsägelsen (beslutad vs. fortfarande öppen,
-          i två filer i samma repo) är inte min att lösa — flaggad till Mikael, väntar på att han
-          stämmer av/uppdaterar `06-50-go-live.md` mot `kmom05.mdx`.
-
-          **Alternativ (för referens — men se ovan, polling är redan den skrivna planen):**
-          1. **Push** — studenten registrerar sin publika `webhookUrl` vid nyckel-provisionering.
-             Kräver att studenten redan har en publikt nåbar server vid kmom05/06, vilket normalt
-             inte är fallet (ingen ngrok/tunnel i kursen).
-          2. **Polling** (`GET /webhooks/pending`) — det redan dokumenterade valet för live. Kräver
-             en kö i exchange-servern (per student, FIFO, ta bort vid hämtning eller TTL). Detta är
-             vad som faktiskt behöver byggas härnäst.
-          3. **SSE-piggyback** — återanvänd den redan existerande utgående SSE-kanalen (05-60/06)
-             och skicka ett `order_filled`-event på den, fortfarande HMAC-signerat på samma sätt
-             som webhooken idag. Skulle dock kräva att `/market/feed` går från ett publikt
-             broadcast-till-alla-klienter-mönster (dagens `simulator.ts`) till adresserbara
-             per-klient-event, eftersom orderfyllnader är privat data — större ändring än polling.
-          `ngrok`/tunnel bedömdes redan bort (extra verktyg för en liten kursdel).
-
-          **Rekommendation:** bygg `GET /webhooks/pending` som en polling-endpoint (kö-tabell,
-          per student, ta bort vid hämtning eller TTL) — det är redan den dokumenterade planen och
-          minsta ändringen ovanpå den seam som redan finns (`notifyOrderFilled()`, byggd under
-          matchningsmotor-arbetet just för att göra transportvalet till en isolerad ändring). Gör
-          det i en egen, avgränsad ändring — rör inte matchningsmotorn.
+          **Webhook-leverans på live — löst 2026-10-25 (polling):** exchange köar signerade
+          webhooks per student och pushar inget; studenten pollar `GET /webhooks/pending` och
+          kvitterar med `POST /webhooks/pending/ack`. Hemligheten ägs av exchange
+          (`GET /webhooks/secret`), inte av api-servern. Se CLAUDE.md, "HMAC-webhooks".
 
 - [ ] **Spår A — nyhetsflöde utan AI** (SSE `news`-event) — svängningar med en förklaring,
       inte bara brus. Enklare lösning, kör vidare på den här. Bygg efter matchningsmotorn

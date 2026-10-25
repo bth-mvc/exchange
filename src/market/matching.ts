@@ -1,7 +1,7 @@
 import { db, ensureStudent } from '../db.js'
 import type { OrderRow } from '../db.js'
 import { nextId } from '../idGen.js'
-import { notifyOrderFilled } from '../webhook/notify.js'
+import { enqueueOrderFilled } from '../webhook/queue.js'
 import { broadcast } from './simulator.js'
 import { setPrice } from './tokens.js'
 
@@ -12,8 +12,6 @@ export interface PlaceOrderInput {
   amount: number
   price: number
   userId?: string
-  webhookUrl?: string
-  webhookSecret?: string
 }
 
 function getOrder(id: string): OrderRow {
@@ -22,8 +20,8 @@ function getOrder(id: string): OrderRow {
 
 export function insertOrder(id: string, input: PlaceOrderInput): OrderRow {
   db.prepare(
-    `INSERT INTO orders (id, acronym, token, side, price, amount, remaining, status, user_id, webhook_url, webhook_secret)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)`,
+    `INSERT INTO orders (id, acronym, token, side, price, amount, remaining, status, user_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
   ).run(
     id,
     input.acronym,
@@ -33,8 +31,6 @@ export function insertOrder(id: string, input: PlaceOrderInput): OrderRow {
     input.amount,
     input.amount,
     input.userId ?? null,
-    input.webhookUrl ?? null,
-    input.webhookSecret ?? null,
   )
   return getOrder(id)
 }
@@ -101,7 +97,7 @@ export function settleFill(
   order.remaining = remaining
   order.status = status
 
-  notifyOrderFilled(order, amount, price, timestamp)
+  enqueueOrderFilled(order, amount, price, timestamp)
 }
 
 /**
