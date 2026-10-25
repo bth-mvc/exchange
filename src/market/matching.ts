@@ -20,7 +20,7 @@ function getOrder(id: string): OrderRow {
   return db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as OrderRow
 }
 
-function insertOrder(id: string, input: PlaceOrderInput): OrderRow {
+export function insertOrder(id: string, input: PlaceOrderInput): OrderRow {
   db.prepare(
     `INSERT INTO orders (id, acronym, token, side, price, amount, remaining, status, user_id, webhook_url, webhook_secret)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)`,
@@ -104,10 +104,56 @@ export function settleFill(
   notifyOrderFilled(order, amount, price, timestamp)
 }
 
-/** Inserts an order and matches it against the resting book on price/time priority. */
-export function placeAndMatch(id: string, input: PlaceOrderInput): void {
+/**
+ * Why a student cannot place an order, or undefined if they can. Open orders
+ * reserve what they may still spend (buy) or deliver (sell).
+ */
+export function insufficientFunds(
+  acronym: string,
+  token: string,
+  side: 'buy' | 'sell',
+  amount: number,
+  price: number,
+): string | undefined {
+  ensureStudent(acronym)
+
+  if (side === 'buy') {
+    const { balance } = db
+      .prepare(`SELECT balance FROM students WHERE acronym = ?`)
+      .get(acronym) as {
+      balance: number
+    }
+    const { reserved } = db
+      .prepare(
+        `SELECT COALESCE(SUM(remaining * price), 0) AS reserved FROM orders
+         WHERE acronym = ? AND side = 'buy' AND status = 'open'`,
+      )
+      .get(acronym) as { reserved: number }
+    const available = balance - reserved
+    return amount * price > available + 1e-9
+      ? `Insufficient balance: the order costs ${+(amount * price).toFixed(2)}, available ${+available.toFixed(2)}`
+      : undefined
+  }
+
+  const holding = db
+    .prepare(`SELECT amount FROM holdings WHERE acronym = ? AND token = ?`)
+    .get(acronym, token) as { amount: number } | undefined
+  const { reserved } = db
+    .prepare(
+      `SELECT COALESCE(SUM(remaining), 0) AS reserved FROM orders
+       WHERE acronym = ? AND token = ? AND side = 'sell' AND status = 'open'`,
+    )
+    .get(acronym, token) as { reserved: number }
+  const available = (holding?.amount ?? 0) - reserved
+  return amount > available
+    ? `Insufficient holdings: the order sells ${amount} ${token}, available ${available}`
+    : undefined
+}
+
+/** Matches an inserted order against the resting book on price/time priority. */
+export function matchOrder(id: string): void {
   const run = db.transaction(() => {
-    let taker = insertOrder(id, input)
+    let taker = getOrder(id)
 
     while (taker.remaining > 0) {
       const maker = findCrossingMaker(taker)
@@ -134,4 +180,10 @@ export function placeAndMatch(id: string, input: PlaceOrderInput): void {
   })
 
   run()
+}
+
+/** Inserts an order and matches it against the resting book. */
+export function placeAndMatch(id: string, input: PlaceOrderInput): void {
+  insertOrder(id, input)
+  matchOrder(id)
 }

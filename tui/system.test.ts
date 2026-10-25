@@ -19,6 +19,11 @@ vi.mock('../src/middleware/apiKeyAuth.js', () => ({
 }))
 
 async function mockStudent(acronym: string) {
+  // Orders are checked against holdings: give the student something to sell.
+  db.prepare(`INSERT OR IGNORE INTO students (acronym) VALUES (?)`).run(acronym)
+  db.prepare(
+    `INSERT OR REPLACE INTO holdings (acronym, token, amount) VALUES (?, 'FIKA', 100)`,
+  ).run(acronym)
   const { apiKeyAuth } = await import('../src/middleware/apiKeyAuth.js')
   vi.mocked(apiKeyAuth).mockImplementationOnce(async (_req, res, next) => {
     res.locals.student = {

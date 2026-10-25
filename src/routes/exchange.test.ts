@@ -14,7 +14,21 @@ function fakeSseClient() {
   return { write: vi.fn() } as unknown as Response
 }
 
+// Orders are checked against balance and holdings, so give each mocked student
+// some of every token to sell.
+function giveTokens(acronym: string, amount = 100) {
+  db.prepare(`INSERT OR IGNORE INTO students (acronym) VALUES (?)`).run(acronym)
+  for (const token of ['FIKA', 'SUDO', 'YOLO', 'DEPLOY', 'MEME', 'HODL']) {
+    db.prepare(`INSERT OR REPLACE INTO holdings (acronym, token, amount) VALUES (?, ?, ?)`).run(
+      acronym,
+      token,
+      amount,
+    )
+  }
+}
+
 async function mockStudent(acronym: string, webhookSecret = 'test-secret-16-chars') {
+  giveTokens(acronym)
   const { apiKeyAuth } = await import('../middleware/apiKeyAuth.js')
   vi.mocked(apiKeyAuth).mockImplementationOnce(async (_req, res, next) => {
     res.locals.student = { acronym, webhookUrl: 'http://localhost:9999/wh', webhookSecret }
@@ -133,6 +147,48 @@ describe('POST /orders', () => {
   it('returns 400 for missing fields', async () => {
     const res = await request(app).post('/orders').set('X-Api-Key', 'any').send({ token: 'FIKA' })
     expect(res.status).toBe(400)
+  })
+})
+
+describe('POST /orders — balance and holdings', () => {
+  it('rejects a buy that costs more than the balance', async () => {
+    const res = await request(app).post('/orders').set('X-Api-Key', 'any').send({
+      token: 'HODL',
+      side: 'buy',
+      amount: 101,
+      price: 100,
+    })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/^Insufficient balance/)
+  })
+
+  it('counts open buy orders as reserved', async () => {
+    const order = { token: 'HODL', side: 'buy', amount: 60, price: 100 }
+    const first = await request(app).post('/orders').set('X-Api-Key', 'any').send(order)
+    const second = await request(app).post('/orders').set('X-Api-Key', 'any').send(order)
+    expect(first.status).toBe(201)
+    expect(second.status).toBe(400)
+  })
+
+  it('rejects a sell of tokens the student does not have', async () => {
+    const res = await request(app).post('/orders').set('X-Api-Key', 'any').send({
+      token: 'FIKA',
+      side: 'sell',
+      amount: 1,
+      price: 10,
+    })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/^Insufficient holdings/)
+  })
+
+  it('counts open sell orders as reserved', async () => {
+    const order = { token: 'FIKA', side: 'sell', amount: 60, price: 99 }
+    await mockStudent('rsv')
+    const first = await request(app).post('/orders').set('X-Api-Key', 'r').send(order)
+    await mockStudent('rsv')
+    const second = await request(app).post('/orders').set('X-Api-Key', 'r').send(order)
+    expect(first.status).toBe(201)
+    expect(second.status).toBe(400)
   })
 })
 

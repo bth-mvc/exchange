@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { nextId } from '../idGen.js'
-import { placeAndMatch } from '../market/matching.js'
+import { insertOrder, insufficientFunds, matchOrder } from '../market/matching.js'
 import { getToken } from '../market/tokens.js'
 
 export const ordersRouter = Router()
@@ -33,19 +33,16 @@ ordersRouter.post('/', (req, res) => {
     webhookSecret: string
   }
 
+  const shortfall = insufficientFunds(acronym, token, side, amount, price)
+  if (shortfall) {
+    res.status(400).json({ error: shortfall })
+    return
+  }
+
+  // Insert now, so the next order already sees this one's reservation; match after the response.
   const orderId = nextId('order')
+  insertOrder(orderId, { acronym, token, side, amount, price, userId, webhookUrl, webhookSecret })
   res.status(201).json({ id: orderId, token, side, amount, price, status: 'open' })
 
-  setImmediate(() => {
-    placeAndMatch(orderId, {
-      acronym,
-      token,
-      side,
-      amount,
-      price,
-      userId,
-      webhookUrl,
-      webhookSecret,
-    })
-  })
+  setImmediate(() => matchOrder(orderId))
 })
