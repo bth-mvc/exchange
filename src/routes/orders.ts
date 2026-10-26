@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { nextId } from '../idGen.js'
 import { insertOrder, insufficientFunds, matchOrder } from '../market/matching.js'
-import { getToken } from '../market/tokens.js'
+import { getToken, outsidePriceBand } from '../market/tokens.js'
 
 export const ordersRouter = Router()
 
@@ -24,6 +24,12 @@ ordersRouter.post('/', (req, res) => {
   const { token, side, amount, price, userId } = result.data
   if (!getToken(token)) {
     res.status(400).json({ error: `Unknown token: ${token}` })
+    return
+  }
+
+  const offBand = outsidePriceBand(token, price)
+  if (offBand) {
+    res.status(400).json({ error: offBand })
     return
   }
 

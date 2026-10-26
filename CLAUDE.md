@@ -141,6 +141,22 @@ Sex tokens i tre kategorier:
 | `MEME` | Meme Token | volatile | 0.69 |
 | `HODL` | Hodl Token | yield | 100.00 |
 
+## Prissättning och market makern Marvin
+
+- **Referenspris** (`token.price`): det marknaden visar, det Marvin lägger sina ordrar kring och det
+  innehav värderas till på leaderboarden. Prissimulatorn slumpar det ±2 % och drar det sakta
+  tillbaka mot startpriset (`PRICE_REVERSION`). En affär sätter det inte, den knuffar det en bit
+  mot affärens pris, mer ju större affären är (`PRICE_IMPACT`, en affär värd en hel
+  Marvin-order flyttar priset en fjärdedel av avståndet).
+- **Prisband:** `POST /orders` nekar (400) ordrar mer än `PRICE_BAND_PCT` (10 %) från
+  referenspriset, så två studenter kan inte flytta marknaden med en affär till ett påhittat pris.
+- **Marvin** (`MARKET_MAKER_ACRONYM`, `marvin`) lägger varje sekund ett köp och ett sälj per token,
+  ±2 % kring referenspriset, värda ca 5 000 kr vardera. Han tar aldrig en students order: korsar
+  hans pris en students vilande order hoppar han över den sidan. Han går inte igenom
+  saldokontrollen och kan blanka (negativt innehav), men slutar köpa eller sälja en token när
+  positionen passerar `MARKET_MAKER_MAX_POSITION_VALUE` (50 000 kr). Han syns på leaderboarden
+  (`marketMaker: true`); hans vinst eller förlust är värdet minus startkapitalet 100 000.
+
 ## Lokal mock (i student-skeletonen)
 
 Studenterna arbetar mot en lokal mock under development — `mock/` i `bth-mvc/teacher`-repot. Mock:en implementerar samma API-kontrakt och körs via Docker Compose.

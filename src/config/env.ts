@@ -9,9 +9,13 @@ const schema = z.object({
   DB_PATH: z.string().default('./data/exchange.db'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   MARKET_MAKER_SWEEP_INTERVAL_MS: z.coerce.number().default(1000),
-  MARKET_MAKER_ACRONYM: z.string().min(1).default('claude'),
+  MARKET_MAKER_ACRONYM: z.string().min(1).default('marvin'),
   MARKET_MAKER_SPREAD_PCT: z.coerce.number().default(0.02),
   MARKET_MAKER_QUOTE_VALUE: z.coerce.number().default(5000),
+  MARKET_MAKER_MAX_POSITION_VALUE: z.coerce.number().default(50_000),
+  PRICE_BAND_PCT: z.coerce.number().default(0.1),
+  PRICE_IMPACT: z.coerce.number().default(0.25),
+  PRICE_REVERSION: z.coerce.number().default(0.02),
 })
 
 export const env = schema.parse(process.env)

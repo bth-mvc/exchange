@@ -94,19 +94,19 @@ describe('GET /assets/:id/orderbook', () => {
       token: 'MEME',
       side: 'buy',
       amount: 100,
-      price: 0.5,
+      price: 0.65,
     })
     await mockStudent('bkb')
     await request(app).post('/orders').set('X-Api-Key', 'bb').send({
       token: 'MEME',
       side: 'buy',
       amount: 50,
-      price: 0.5,
+      price: 0.65,
     })
     await flush()
 
     const res = await request(app).get('/assets/MEME/orderbook').set('X-Api-Key', 'any')
-    expect(res.body.bids).toEqual([{ price: 0.5, amount: 150, side: 'buy' }])
+    expect(res.body.bids).toEqual([{ price: 0.65, amount: 150, side: 'buy' }])
   })
 
   it('returns 404 for unknown token', async () => {
@@ -176,7 +176,7 @@ describe('POST /orders — balance and holdings', () => {
   })
 
   it('counts open sell orders as reserved', async () => {
-    const order = { token: 'FIKA', side: 'sell', amount: 60, price: 99 }
+    const order = { token: 'FIKA', side: 'sell', amount: 60, price: 10.5 }
     await mockStudent('rsv')
     const first = await request(app).post('/orders').set('X-Api-Key', 'r').send(order)
     await mockStudent('rsv')
@@ -356,7 +356,7 @@ describe('POST /orders — matching', () => {
     expect(data).toMatchObject({ token: 'YOLO', amount: 3, price: 4.2 })
   })
 
-  it('updates the token reference price from a real trade', async () => {
+  it('nudges the token reference price towards a real trade, not all the way', async () => {
     const { getToken } = await import('../market/tokens.js')
 
     await mockStudent('pxa')
@@ -375,7 +375,21 @@ describe('POST /orders — matching', () => {
     })
     await flush()
 
-    expect(getToken('SUDO')?.price).toBe(27.5)
+    const price = getToken('SUDO')!.price
+    expect(price).toBeGreaterThan(25)
+    expect(price).toBeLessThan(27.5)
+  })
+
+  it('refuses an order priced outside the band around the market price', async () => {
+    await mockStudent('band')
+    const res = await request(app).post('/orders').set('X-Api-Key', 'bd').send({
+      token: 'FIKA',
+      side: 'buy',
+      amount: 1,
+      price: 1.0,
+    })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/outside the allowed band/)
   })
 })
 

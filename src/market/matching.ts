@@ -3,7 +3,7 @@ import type { OrderRow } from '../db.js'
 import { nextId } from '../idGen.js'
 import { enqueueOrderFilled } from '../webhook/queue.js'
 import { broadcast } from './simulator.js'
-import { setPrice } from './tokens.js'
+import { nudgePrice } from './tokens.js'
 
 export interface PlaceOrderInput {
   acronym: string
@@ -78,8 +78,9 @@ export function settleFill(
     )
   } else {
     db.prepare(
-      `INSERT INTO holdings (acronym, token, amount) VALUES (?, ?, 0)
-       ON CONFLICT(acronym, token) DO UPDATE SET amount = MAX(0, amount - ?)`,
+      // Only the market maker can sell more than it holds; it then goes short (negative).
+      `INSERT INTO holdings (acronym, token, amount) VALUES (?, ?, -?)
+       ON CONFLICT(acronym, token) DO UPDATE SET amount = amount + excluded.amount`,
     ).run(order.acronym, order.token, amount)
     db.prepare(`UPDATE students SET balance = balance + ? WHERE acronym = ?`).run(
       total,
@@ -161,7 +162,7 @@ export function matchOrder(id: string): void {
 
       settleFill(maker, fillAmount, fillPrice, timestamp)
       settleFill(taker, fillAmount, fillPrice, timestamp)
-      setPrice(taker.token, fillPrice)
+      nudgePrice(taker.token, fillPrice, fillAmount * fillPrice)
       broadcast('trade', {
         token: taker.token,
         side: taker.side,

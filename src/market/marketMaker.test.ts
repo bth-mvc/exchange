@@ -92,7 +92,7 @@ describe('runMarketMakerSweep', () => {
     expect(db.prepare('SELECT acronym FROM webhooks').all()).toEqual([{ acronym: 'aaa' }])
   })
 
-  it('opportunistically crosses a favorably priced resting order when requoting', () => {
+  it('never takes a student order, it skips the side that would cross it', () => {
     placeAndMatch('order-cheap-sell', {
       acronym: 'aaa',
       token: 'FIKA',
@@ -106,6 +106,39 @@ describe('runMarketMakerSweep', () => {
     const order = db
       .prepare('SELECT * FROM orders WHERE id = ?')
       .get('order-cheap-sell') as OrderRow
-    expect(order.status).toBe('filled')
+    expect(order.status).toBe('open')
+    expect(mmOrders('FIKA').map((o) => o.side)).toEqual(['sell'])
+  })
+
+  it('goes short when it sells more than it holds', () => {
+    runMarketMakerSweep()
+    const [, mmSell] = mmOrders('FIKA')
+
+    placeAndMatch('order-buy', {
+      acronym: 'aaa',
+      token: 'FIKA',
+      side: 'buy',
+      amount: 5,
+      price: mmSell.price,
+    })
+
+    const row = db
+      .prepare('SELECT amount FROM holdings WHERE acronym = ? AND token = ?')
+      .get(MM, 'FIKA') as { amount: number }
+    expect(row.amount).toBe(-5)
+  })
+
+  it('stops buying a token when its position is at the limit', () => {
+    runMarketMakerSweep()
+    const units = env.MARKET_MAKER_MAX_POSITION_VALUE / 10
+    db.prepare('INSERT INTO holdings (acronym, token, amount) VALUES (?, ?, ?)').run(
+      MM,
+      'FIKA',
+      units,
+    )
+
+    runMarketMakerSweep()
+
+    expect(mmOrders('FIKA').map((o) => o.side)).toEqual(['sell'])
   })
 })

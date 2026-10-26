@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { db } from '../db.js'
 import type { StudentRow, HoldingRow } from '../db.js'
+import { env } from '../config/env.js'
 import { currentPrice } from '../market/tokens.js'
 
 export const leaderboardRouter = Router()
@@ -11,7 +12,7 @@ leaderboardRouter.get('/', (_req, res) => {
   const ranked = students
     .map((s) => {
       const holdings = db
-        .prepare(`SELECT * FROM holdings WHERE acronym = ? AND amount > 0`)
+        .prepare(`SELECT * FROM holdings WHERE acronym = ? AND amount != 0`)
         .all(s.acronym) as HoldingRow[]
 
       const holdingsValue = holdings.reduce((sum, h) => sum + h.amount * currentPrice(h.token), 0)
@@ -29,6 +30,8 @@ leaderboardRouter.get('/', (_req, res) => {
 
       return {
         acronym: s.acronym,
+        // The market maker is listed too, so you can follow whether it wins or loses.
+        marketMaker: s.acronym === env.MARKET_MAKER_ACRONYM,
         totalValue,
         buys,
         sells,

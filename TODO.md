@@ -3,11 +3,10 @@
 Mina egna anteckningar: saker att göra i närtid. Idéer till nästa kursrunda ligger i
 `FUTURE.md`.
 
-- [ ] **Följ market makern med 100 000 i startkapital.** Sedan 2026-10-26 lägger den varje sekund
-      ett köp och ett sälj per token värt ca 5 000 kr vardera (`MARKET_MAKER_QUOTE_VALUE`), ±2 %
-      kring priset (`MARKET_MAKER_SPREAD_PCT`); tidigare 100 enheter oavsett pris. Se under kursen
-      om stora ordrar driver priset för hårt (varje fyllning mot market makern flyttar priset 2 %);
-      i så fall höj värdet eller sänk spreaden i `.env` på do5, ingen kodändring behövs.
+- [ ] **Följ Marvin (market makern) under kursen.** Prisband, knuffat referenspris, passiva
+      ordrar och positionsgräns finns sedan 2026-10-26 (se CLAUDE.md, Prissättning). Håll koll på
+      hans värde på leaderboarden: växer det stadigt är spreaden för bred för studenterna, sjunker
+      det har någon hittat ett sätt att lura honom. Justera i `.env` på do5 vid behov.
 
 - [ ] `npm audit`: 3 kvarvarande moderate-varningar i vitest/@vitest/coverage-v8/@vitest/mocker
       (path traversal i mock-redirect, GHSA-82fw-gwwq-j7x9). Dev-only, ingen fix uppströms

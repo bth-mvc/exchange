@@ -1,4 +1,5 @@
 import type { Response } from 'express'
+import { env } from '../config/env.js'
 import { tokens, setPrice } from './tokens.js'
 
 const clients = new Set<Response>()
@@ -21,8 +22,9 @@ export function broadcast(event: string, data: unknown): void {
 export function startPriceSimulator(): void {
   setInterval(() => {
     const token = tokens[Math.floor(Math.random() * tokens.length)]
-    const change = token.price * (Math.random() * 0.04 - 0.02)
-    setPrice(token.id, Math.max(0.01, +(token.price + change).toFixed(2)))
+    const noise = token.price * (Math.random() * 0.04 - 0.02)
+    const pull = (token.basePrice - token.price) * env.PRICE_REVERSION
+    setPrice(token.id, token.price + noise + pull)
     broadcast('price', { token: token.id, price: token.price, timestamp: new Date().toISOString() })
   }, 3000)
 }
