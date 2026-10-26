@@ -4,7 +4,7 @@ import type { OrderRow, TradeRow } from '../db.js'
 import { env } from '../config/env.js'
 
 const { placeAndMatch } = await import('./matching.js')
-const { runMarketMakerSweep } = await import('./marketMaker.js')
+const { runMarketMakerSweep, quoteAmount } = await import('./marketMaker.js')
 
 const MM = env.MARKET_MAKER_ACRONYM
 
@@ -31,8 +31,14 @@ describe('runMarketMakerSweep', () => {
     expect(sell.side).toBe('sell')
     expect(buy.price).toBeLessThan(10.0)
     expect(sell.price).toBeGreaterThan(10.0)
-    expect(buy.remaining).toBe(env.MARKET_MAKER_QUOTE_AMOUNT)
-    expect(sell.remaining).toBe(env.MARKET_MAKER_QUOTE_AMOUNT)
+    expect(buy.remaining).toBe(quoteAmount(10.0))
+    expect(sell.remaining).toBe(quoteAmount(10.0))
+  })
+
+  it('sizes each quote by value, so cheap tokens get more units', () => {
+    expect(quoteAmount(10.0)).toBe(Math.round(env.MARKET_MAKER_QUOTE_VALUE / 10))
+    expect(quoteAmount(0.69)).toBeGreaterThan(quoteAmount(100.0))
+    expect(quoteAmount(env.MARKET_MAKER_QUOTE_VALUE * 10)).toBe(1)
   })
 
   it('replaces stale quotes instead of accumulating them', () => {

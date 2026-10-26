@@ -3,15 +3,11 @@
 Mina egna anteckningar: saker att göra i närtid. Idéer till nästa kursrunda ligger i
 `FUTURE.md`.
 
-- [ ] **Startkapital 100 000 i stället för 10 000** (beslut 2026-10-26): koden klar lokalt
-      (`STARTING_BALANCE` i `src/db.ts` sätts uttryckligen vid insert, eftersom en kolumns DEFAULT
-      inte ändras i en befintlig databas; teacher-repots mock, solution och issuer klara).
-      Kvar: deploy, och på do5 `UPDATE students SET balance = balance + 90000` (efter backup).
-
-- [ ] **Balansera market makern mot det större startkapitalet.** Idag lägger den 100 enheter per
-      token och sida varje sekund, ±2 % kring priset (`MARKET_MAKER_QUOTE_AMOUNT`,
-      `MARKET_MAKER_SPREAD_PCT`). Med 100 000 kan en student köpa slut på det snabbt; hitta en
-      nivå där marknaden fungerar (likviditet, prisrörelse, market makerns egen balans).
+- [ ] **Följ market makern med 100 000 i startkapital.** Sedan 2026-10-26 lägger den varje sekund
+      ett köp och ett sälj per token värt ca 5 000 kr vardera (`MARKET_MAKER_QUOTE_VALUE`), ±2 %
+      kring priset (`MARKET_MAKER_SPREAD_PCT`); tidigare 100 enheter oavsett pris. Se under kursen
+      om stora ordrar driver priset för hårt (varje fyllning mot market makern flyttar priset 2 %);
+      i så fall höj värdet eller sänk spreaden i `.env` på do5, ingen kodändring behövs.
 
 - [ ] `npm audit`: 3 kvarvarande moderate-varningar i vitest/@vitest/coverage-v8/@vitest/mocker
       (path traversal i mock-redirect, GHSA-82fw-gwwq-j7x9). Dev-only, ingen fix uppströms
