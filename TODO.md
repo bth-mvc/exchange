@@ -106,3 +106,10 @@ Mina egna anteckningar.
 - [ ] `npm audit`: 3 kvarvarande moderate-varningar i vitest/@vitest/coverage-v8/@vitest/mocker
       (path traversal i mock-redirect, GHSA-82fw-gwwq-j7x9). Dev-only, ingen fix uppströms
       ännu — bevaka och kör `npm audit fix` när en patchad version finns.
+
+- [ ] **FUTURE (kanske nästa kursrunda): smeknamn på leaderboarden.** Idag visar
+      `GET /leaderboard` studentens BTH-akronym, som klasskamrater känner igen
+      (pseudonymt, inte anonymt). Idé: kolumnen `nickname` i `students`, en endpoint som
+      `PUT /me/nickname` (med API-nyckeln), och leaderboarden visar smeknamnet om det finns,
+      annars en neutral etikett som "Trader 7" i stället för akronymen. Studenten sätter det
+      via Bruno/Swagger i 06-50. Beslut 2026-10-26: inte nu, pseudonymt räcker i år.
