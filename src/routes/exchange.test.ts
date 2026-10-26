@@ -149,7 +149,7 @@ describe('POST /orders — balance and holdings', () => {
     const res = await request(app).post('/orders').set('X-Api-Key', 'any').send({
       token: 'HODL',
       side: 'buy',
-      amount: 101,
+      amount: 1001,
       price: 100,
     })
     expect(res.status).toBe(400)
@@ -157,7 +157,7 @@ describe('POST /orders — balance and holdings', () => {
   })
 
   it('counts open buy orders as reserved', async () => {
-    const order = { token: 'HODL', side: 'buy', amount: 60, price: 100 }
+    const order = { token: 'HODL', side: 'buy', amount: 600, price: 100 }
     const first = await request(app).post('/orders').set('X-Api-Key', 'any').send(order)
     const second = await request(app).post('/orders').set('X-Api-Key', 'any').send(order)
     expect(first.status).toBe(201)
@@ -476,7 +476,7 @@ describe('GET /portfolio', () => {
   it('returns default portfolio for new student', async () => {
     const res = await request(app).get('/portfolio').set('X-Api-Key', 'any')
     expect(res.status).toBe(200)
-    expect(res.body.balance).toBe(10000)
+    expect(res.body.balance).toBe(100000)
     expect(res.body.holdings).toEqual([])
   })
 })

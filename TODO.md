@@ -3,10 +3,10 @@
 Mina egna anteckningar: saker att göra i närtid. Idéer till nästa kursrunda ligger i
 `FUTURE.md`.
 
-- [ ] **Startkapital 100 000 i stället för 10 000** (beslut 2026-10-26, görs efter 05-50-granskningen):
-      `DEFAULT 10000` i `src/db.ts`, `UPDATE` av befintliga rader på do5, och samma belopp i
-      teacher-repots mock (`mock/src/server.js`), `solution/` (`portfolioRepository.create`, tester)
-      och issuetexterna 05-10, 05-40, 05-50, 06-45.
+- [ ] **Startkapital 100 000 i stället för 10 000** (beslut 2026-10-26): koden klar lokalt
+      (`STARTING_BALANCE` i `src/db.ts` sätts uttryckligen vid insert, eftersom en kolumns DEFAULT
+      inte ändras i en befintlig databas; teacher-repots mock, solution och issuer klara).
+      Kvar: deploy, och på do5 `UPDATE students SET balance = balance + 90000` (efter backup).
 
 - [ ] **Balansera market makern mot det större startkapitalet.** Idag lägger den 100 enheter per
       token och sida varje sekund, ±2 % kring priset (`MARKET_MAKER_QUOTE_AMOUNT`,

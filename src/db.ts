@@ -15,7 +15,7 @@ export const db = new Database(dbPath)
 db.exec(`
   CREATE TABLE IF NOT EXISTS students (
     acronym    TEXT PRIMARY KEY,
-    balance    REAL NOT NULL DEFAULT 10000,
+    balance    REAL NOT NULL DEFAULT 100000,
     webhook_secret TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -116,12 +116,15 @@ function newWebhookSecret(): string {
   return `whsec_${randomBytes(24).toString('hex')}`
 }
 
+/** What a new student starts with. Set explicitly on insert: a column DEFAULT in an
+ *  existing database keeps the value from when the table was created. */
+export const STARTING_BALANCE = 100_000
+
 /** Creates the student on first use, with a webhook secret of their own. */
 export function ensureStudent(acronym: string): void {
-  db.prepare(`INSERT OR IGNORE INTO students (acronym, webhook_secret) VALUES (?, ?)`).run(
-    acronym,
-    newWebhookSecret(),
-  )
+  db.prepare(
+    `INSERT OR IGNORE INTO students (acronym, balance, webhook_secret) VALUES (?, ?, ?)`,
+  ).run(acronym, STARTING_BALANCE, newWebhookSecret())
   db.prepare(
     `UPDATE students SET webhook_secret = ? WHERE acronym = ? AND webhook_secret IS NULL`,
   ).run(newWebhookSecret(), acronym)
