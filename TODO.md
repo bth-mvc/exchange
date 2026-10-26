@@ -3,6 +3,16 @@
 Mina egna anteckningar: saker att göra i närtid. Idéer till nästa kursrunda ligger i
 `FUTURE.md`.
 
+- [ ] **Startkapital 100 000 i stället för 10 000** (beslut 2026-10-26, görs efter 05-50-granskningen):
+      `DEFAULT 10000` i `src/db.ts`, `UPDATE` av befintliga rader på do5, och samma belopp i
+      teacher-repots mock (`mock/src/server.js`), `solution/` (`portfolioRepository.create`, tester)
+      och issuetexterna 05-10, 05-40, 05-50, 06-45.
+
+- [ ] **Balansera market makern mot det större startkapitalet.** Idag lägger den 100 enheter per
+      token och sida varje sekund, ±2 % kring priset (`MARKET_MAKER_QUOTE_AMOUNT`,
+      `MARKET_MAKER_SPREAD_PCT`). Med 100 000 kan en student köpa slut på det snabbt; hitta en
+      nivå där marknaden fungerar (likviditet, prisrörelse, market makerns egen balans).
+
 - [ ] `npm audit`: 3 kvarvarande moderate-varningar i vitest/@vitest/coverage-v8/@vitest/mocker
       (path traversal i mock-redirect, GHSA-82fw-gwwq-j7x9). Dev-only, ingen fix uppströms
       ännu — bevaka och kör `npm audit fix` när en patchad version finns.
