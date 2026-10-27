@@ -17,6 +17,7 @@ Tokenbörsen för MVC-kursen vid BTH. Gemensam exchange-server som alla studente
 | `npm run test:coverage` | Tester med coverage-rapport |
 | `npm run build` | Kompilera TypeScript |
 | `npm run release:patch` | Kör check, bumpar patch-version och pushar tagg |
+| `npm run release:minor` / `release:major` | Samma för minor/major. Tagga aldrig för hand: deployen stoppar om taggen inte är samma som versionen i `package.json` |
 | `npm run clean` | Ta bort node_modules och package-lock |
 | `npm run clean:all` | Ta även bort dist, coverage och data |
 
