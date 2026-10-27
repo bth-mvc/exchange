@@ -36,3 +36,10 @@ ligger i `TODO.md`.
       `PUT /me/nickname` (med API-nyckeln), och leaderboarden visar smeknamnet om det finns,
       annars en neutral etikett som "Trader 7" i stället för akronymen. Studenten sätter det
       via Bruno/Swagger i 06-50. Beslut 2026-10-26: inte nu, pseudonymt räcker i år.
+
+- [ ] **Yield-utdelning och marknadshändelser.** Föreläsningen om tokenbörsen beskrev HODL som
+      en yield-token med automatisk utdelning varje timme (`event: yield` i SSE) och
+      marknadshändelser som flyttar priser. Inget av det är byggt i v1.3.0; HODL handlas som
+      vilken token som helst. Beslut 2026-10-27: borttaget ur föreläsningen och kmom05.mdx tills
+      vidare. Om det byggs: utdelning i `portfolio`-saldot, ett `yield`-event i
+      `/market/feed`, och samma i mocken, sedan tillbaka i föreläsningen.
