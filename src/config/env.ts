@@ -16,6 +16,8 @@ const schema = z.object({
   PRICE_BAND_PCT: z.coerce.number().default(0.1),
   PRICE_IMPACT: z.coerce.number().default(0.25),
   PRICE_REVERSION: z.coerce.number().default(0.02),
+  RATE_LIMIT_MAX: z.coerce.number().default(120),
+  RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),
 })
 
 export const env = schema.parse(process.env)

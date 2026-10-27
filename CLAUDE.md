@@ -30,6 +30,14 @@ X-Api-Key: <api-key>
 ?api_key=<api-key>
 ```
 
+### Rate limit
+
+Efter nyckelkontrollen räknas anropen per student (acronym) i ett fast fönster: högst
+`RATE_LIMIT_MAX` (120) anrop per `RATE_LIMIT_WINDOW_MS` (60 s). Över gränsen blir svaret 429
+`{ "error": "Too many requests" }` med `Retry-After` i hela sekunder tills fönstret öppnar igen,
+plus `RateLimit-Limit` och `RateLimit-Remaining` på alla svar. Studenternas retry med backoff
+(issue 06-30) läser `Retry-After`. Mocken har samma beteende (`src/middleware/rateLimit.ts`).
+
 ### REST-endpoints
 
 | Method | Path | Beskrivning |
@@ -203,6 +211,8 @@ Om api-servern inte svarar och nyckeln inte finns i cachen → returnera `401 Un
 | `API_KEY_SERVER_URL` | `http://localhost:5000` | URL till api-servern |
 | `SERVICE_TOKEN` | — | X-Service-Token för anrop till api-servern (krävs) |
 | `KEY_CACHE_TTL_MS` | `86400000` | Cache-TTL i ms (default 24h) |
+| `RATE_LIMIT_MAX` | `120` | Max antal anrop per student och fönster |
+| `RATE_LIMIT_WINDOW_MS` | `60000` | Rate limit-fönstrets längd i ms |
 
 ## API-dokumentation
 

@@ -1,7 +1,11 @@
 openapi: '3.1.0'
 info:
   title: BTH Exchange
-  description: Tokenbörsen för MVC-kursen vid BTH
+  description: |
+    Tokenbörsen för MVC-kursen vid BTH.
+
+    Rate limit: högst 120 anrop per minut och API-nyckel. Över gränsen svarar börsen 429 med
+    `Retry-After` (sekunder tills fönstret öppnar igen).
   version: '1.3.0'
 
 servers:
@@ -43,6 +47,8 @@ paths:
           description: Lista med tokens
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /assets/{id}/orderbook:
     get:
@@ -60,6 +66,8 @@ paths:
           description: Orderbok med bids och asks
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -101,6 +109,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /trades:
     get:
@@ -122,6 +132,8 @@ paths:
           description: Lista med trades och nästa cursor
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /portfolio:
     get:
@@ -132,6 +144,8 @@ paths:
           description: Balans, holdings och totalvärde
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /leaderboard:
     get:
@@ -142,6 +156,8 @@ paths:
           description: Rankad lista med alla studenter
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /market/feed:
     get:
@@ -158,6 +174,8 @@ paths:
                 type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /webhooks/secret:
     get:
@@ -171,6 +189,8 @@ paths:
           description: '{ "secret": "whsec_..." }'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /webhooks/pending:
     get:
@@ -190,6 +210,8 @@ paths:
           description: '{ "webhooks": [{ "id": "wh-...", "body": "{...}", "signature": "sha256=..." }] }'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /webhooks/pending/ack:
     post:
@@ -216,6 +238,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
 components:
   securitySchemes:
@@ -226,6 +250,21 @@ components:
       description: 'Studentens API-nyckel. Kan även skickas som query-parameter: ?api_key=<key>'
 
   responses:
+    TooManyRequests:
+      description: För många anrop — vänta det antal sekunder som Retry-After anger
+      headers:
+        Retry-After:
+          description: Sekunder tills rate limit-fönstret öppnar igen
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Too many requests
     Unauthorized:
       description: Ogiltig eller saknad API-nyckel
       content:

@@ -6,6 +6,7 @@ import swaggerUi from 'swagger-ui-express'
 import { parse } from 'yaml'
 import { apiKeyAuth } from './middleware/apiKeyAuth.js'
 import { errorHandler } from './middleware/errorHandler.js'
+import { rateLimit } from './middleware/rateLimit.js'
 import { assetsRouter } from './routes/assets.js'
 import { ordersRouter } from './routes/orders.js'
 import { tradesRouter } from './routes/trades.js'
@@ -35,6 +36,7 @@ app.get('/health', (_req, res) => {
 })
 
 app.use(apiKeyAuth)
+app.use(rateLimit)
 
 app.use('/assets', assetsRouter)
 app.use('/orders', ordersRouter)
