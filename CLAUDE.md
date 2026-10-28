@@ -44,6 +44,7 @@ plus `RateLimit-Limit` och `RateLimit-Remaining` på alla svar. Studenternas ret
 |---|---|---|
 | `GET` | `/assets` | Lista alla tokens med aktuellt pris |
 | `GET` | `/assets/:id/orderbook` | Orderbok för en specifik token |
+| `GET` | `/assets/:id/history?range=10m\|1d\|30d` | Prispunkter äldst först: varje tick, sista per 5 min, stängning per dag |
 | `POST` | `/orders` | Lägg en order (buy/sell) |
 | `GET` | `/orders?status=open` | Egna ordrar med status (`open`/`filled`/`cancelled`), nyast först, max 100 |
 | `DELETE` | `/orders/:id` | Avbryt en egen öppen order (404 annans/okänd, 409 ej öppen) |
@@ -166,7 +167,11 @@ Sex tokens i tre kategorier:
   innehav värderas till på leaderboarden. Prissimulatorn slumpar det ±2 % och drar det sakta
   tillbaka mot baspriset (`PRICE_REVERSION`). Baspriset är startpriset tills en stor nyhet
   flyttar det, och dras i sin tur mycket sakta tillbaka mot startpriset (`BASE_REVERSION`).
-  Priser och baspriser sparas inte: en omstart börjar om från startpriserna. En affär sätter det inte, den knuffar det en bit
+  Pris och baspris sparas var `HISTORY_SAMPLE_MS` (10 s) i `token_state`, så en omstart
+  fortsätter där marknaden var. `/assets` visar bara `id`, `name`, `type` och `price`: baspriset
+  säger vart priset är på väg och ska inte ges bort till en bot.
+- **Historik:** samma sampling sparar en tick per token i `price_ticks` (ett dygn) och dagens
+  stängningspris i `price_days` (för alltid), för `GET /assets/:id/history`. En affär sätter det inte, den knuffar det en bit
   mot affärens pris, mer ju större affären är (`PRICE_IMPACT`, en affär värd en hel
   Marvin-order flyttar priset en fjärdedel av avståndet).
 - **Prisband:** `POST /orders` nekar (400) ordrar mer än `PRICE_BAND_PCT` (10 %) från
@@ -250,6 +255,7 @@ Om api-servern inte svarar och nyckeln inte finns i cachen → returnera `401 Un
 | `KEY_CACHE_TTL_MS` | `86400000` | Cache-TTL i ms (default 24h) |
 | `RATE_LIMIT_MAX` | `120` | Max antal anrop per student och fönster |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | Rate limit-fönstrets längd i ms |
+| `HISTORY_SAMPLE_MS` | `10000` | Hur ofta priserna sparas (historik och omstart) |
 | `NEWS_ENABLED`, `NEWS_*`, `BIG_EVENT_*`, `RUMOR_*`, `BASE_REVERSION`, `MARKET_MAKER_EVENT_SPREAD_FACTOR` | se `src/config/env.ts` | Nyhetsflödet, se Nyheter ovan |
 
 ## API-dokumentation

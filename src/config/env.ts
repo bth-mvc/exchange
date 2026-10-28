@@ -33,6 +33,7 @@ const schema = z.object({
   RUMOR_ACCURACY: z.coerce.number().min(0).max(1).default(0.75),
   NEWS_KEEP_DAYS: z.coerce.number().default(1),
   BIG_EVENT_KEEP_DAYS: z.coerce.number().default(60),
+  HISTORY_SAMPLE_MS: z.coerce.number().default(10_000),
   RATE_LIMIT_MAX: z.coerce.number().default(120),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),
 })

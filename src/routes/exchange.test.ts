@@ -61,6 +61,7 @@ describe('GET /assets', () => {
     expect(res.body).toHaveLength(6)
     expect(res.body[0]).toHaveProperty('id')
     expect(res.body[0]).toHaveProperty('price')
+    expect(Object.keys(res.body[0]).sort()).toEqual(['id', 'name', 'price', 'type'])
   })
 })
 
@@ -544,6 +545,23 @@ describe('GET /market/feed', () => {
     })
     const res = await request(app).get('/market/feed')
     expect(res.status).toBe(401)
+  })
+})
+
+describe('GET /assets/:id/history', () => {
+  it('returns the points for a range', async () => {
+    db.prepare('DELETE FROM price_ticks').run()
+    db.prepare(`INSERT INTO price_ticks (token, timestamp, price) VALUES ('FIKA', ?, 10.5)`).run(
+      new Date().toISOString(),
+    )
+    const res = await request(app).get('/assets/fika/history?range=10m')
+    expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({ token: 'FIKA', range: '10m', points: [{ price: 10.5 }] })
+  })
+
+  it('refuses an unknown token or range', async () => {
+    expect((await request(app).get('/assets/NOPE/history')).status).toBe(404)
+    expect((await request(app).get('/assets/FIKA/history?range=1y')).status).toBe(400)
   })
 })
 

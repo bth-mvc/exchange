@@ -5,9 +5,11 @@ import { runMarketMakerSweep } from './market/marketMaker.js'
 import { startPriceSimulator } from './market/simulator.js'
 import { broadcastOrderbooks } from './market/orderbook.js'
 import { startNewsFeed } from './market/news.js'
+import { startHistory } from './market/history.js'
 
 app.listen(env.PORT, () => {
   logger.info(`Exchange running on http://localhost:${env.PORT}`)
+  startHistory()
   startPriceSimulator()
   if (env.NEWS_ENABLED) startNewsFeed()
   setInterval(() => {

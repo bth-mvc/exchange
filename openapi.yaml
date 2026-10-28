@@ -77,6 +77,62 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /assets/{id}/history:
+    get:
+      tags: [assets]
+      summary: Prishistorik för en token
+      description: |
+        Punkter äldst först, för att rita en graf. `10m` ger varje sparat pris (var 10:e sekund)
+        de senaste tio minuterna, `1d` det sista priset i varje femminutersperiod det senaste
+        dygnet och `30d` stängningspriset per dag (dagens hittills), där `timestamp` är datumet.
+        Stora nyheter för samma period finns i `GET /market/news?impact=big`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: YOLO
+        - name: range
+          in: query
+          schema:
+            type: string
+            enum: [10m, 1d, 30d]
+            default: 1d
+      responses:
+        '200':
+          description: Prispunkter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: YOLO
+                  range:
+                    type: string
+                    example: 1d
+                  points:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        timestamp:
+                          type: string
+                          example: '2026-10-28T12:05:00.000Z'
+                        price:
+                          type: number
+                          example: 4.31
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
   /orders:
     post:
       tags: [orders]

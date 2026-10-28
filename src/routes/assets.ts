@@ -1,11 +1,15 @@
 import { Router } from 'express'
 import { tokens, getToken } from '../market/tokens.js'
 import { orderbook } from '../market/orderbook.js'
+import { priceHistory, ranges } from '../market/history.js'
+import type { Range } from '../market/history.js'
 
 export const assetsRouter = Router()
 
+/** The tokens with their current price. The base and start prices stay inside the exchange:
+ *  they say where the price is heading, which a bot should not get for free. */
 assetsRouter.get('/', (_req, res) => {
-  res.json(tokens)
+  res.json(tokens.map(({ id, name, type, price }) => ({ id, name, type, price })))
 })
 
 assetsRouter.get('/:id/orderbook', (req, res) => {
@@ -16,4 +20,19 @@ assetsRouter.get('/:id/orderbook', (req, res) => {
   }
 
   res.json(orderbook(token.id))
+})
+
+/** The token's price over `range` (10m, 1d or 30d), oldest first, for drawing a chart. */
+assetsRouter.get('/:id/history', (req, res) => {
+  const token = getToken(req.params.id)
+  if (!token) {
+    res.status(404).json({ error: 'Token not found' })
+    return
+  }
+  const range = ((req.query.range as string | undefined) ?? '1d') as Range
+  if (!ranges.includes(range)) {
+    res.status(400).json({ error: `Unknown range ${range}, use ${ranges.join(', ')}` })
+    return
+  }
+  res.json({ token: token.id, range, points: priceHistory(token.id, range) })
 })

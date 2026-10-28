@@ -78,6 +78,27 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_news_timestamp ON news (timestamp);
+
+  CREATE TABLE IF NOT EXISTS price_ticks (
+    token     TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    price     REAL NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_price_ticks ON price_ticks (token, timestamp);
+
+  CREATE TABLE IF NOT EXISTS price_days (
+    token TEXT NOT NULL,
+    day   TEXT NOT NULL,
+    close REAL NOT NULL,
+    PRIMARY KEY (token, day)
+  );
+
+  CREATE TABLE IF NOT EXISTS token_state (
+    token      TEXT PRIMARY KEY,
+    price      REAL NOT NULL,
+    base_price REAL NOT NULL
+  );
 `)
 
 // Databases from before webhook secrets: add the column; ensureStudent fills it in.
