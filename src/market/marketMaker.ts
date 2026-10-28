@@ -6,25 +6,32 @@ import { tokens } from './tokens.js'
 
 const MM_ACRONYM = env.MARKET_MAKER_ACRONYM
 
-/** Liquidity floor: keeps a two-sided quote resting around the reference price for every token.
- *  Each side is worth about MARKET_MAKER_QUOTE_VALUE, so a cheap token gets many units and an
- *  expensive one few, and every token offers the same liquidity in money. The market maker only
- *  provides liquidity: it never takes a student's order, and it stops adding to a position that
- *  has grown past MARKET_MAKER_MAX_POSITION_VALUE in either direction. */
+/** Liquidity floor: keeps a ladder of quotes resting around the reference price for every token,
+ *  MARKET_MAKER_LEVELS levels on each side. The first level is MARKET_MAKER_SPREAD_PCT from the
+ *  reference price, each further level MARKET_MAKER_LEVEL_STEP_PCT further out and half a quote
+ *  larger, so the book has depth and a large order moves through several prices. The first level
+ *  is worth about MARKET_MAKER_QUOTE_VALUE, so a cheap token gets many units and an expensive one
+ *  few, and every token offers the same liquidity in money. The market maker only provides
+ *  liquidity: it never takes a student's order, and it stops adding to a position that has grown
+ *  past MARKET_MAKER_MAX_POSITION_VALUE in either direction. */
 export function runMarketMakerSweep(): void {
   ensureStudent(MM_ACRONYM)
   db.prepare(`DELETE FROM orders WHERE acronym = ? AND status = 'open'`).run(MM_ACRONYM)
 
   for (const token of tokens) {
-    const spread = token.price * env.MARKET_MAKER_SPREAD_PCT
     const amount = quoteAmount(token.price)
     const position = positionValue(token.id, token.price)
 
-    if (position < env.MARKET_MAKER_MAX_POSITION_VALUE) {
-      quote(token.id, 'buy', amount, +(token.price - spread).toFixed(2))
-    }
-    if (position > -env.MARKET_MAKER_MAX_POSITION_VALUE) {
-      quote(token.id, 'sell', amount, +(token.price + spread).toFixed(2))
+    for (let level = 0; level < env.MARKET_MAKER_LEVELS; level++) {
+      const spread =
+        token.price * (env.MARKET_MAKER_SPREAD_PCT + level * env.MARKET_MAKER_LEVEL_STEP_PCT)
+      const size = Math.round(amount * (1 + level / 2))
+      if (position < env.MARKET_MAKER_MAX_POSITION_VALUE) {
+        quote(token.id, 'buy', size, +(token.price - spread).toFixed(2))
+      }
+      if (position > -env.MARKET_MAKER_MAX_POSITION_VALUE) {
+        quote(token.id, 'sell', size, +(token.price + spread).toFixed(2))
+      }
     }
   }
 }
@@ -42,8 +49,8 @@ function positionValue(token: string, price: number): number {
   return (row?.amount ?? 0) * price
 }
 
-/** Rests one side of the quote without matching it. If it would cross a student's order, that
- *  side is skipped for this sweep: the student's price is already better than the market
+/** Rests one level of the quote without matching it. If it would cross a student's order, that
+ *  level is skipped for this sweep: the student's price is already better than the market
  *  maker's, so it leaves the trade to the students instead of taking it. */
 function quote(token: string, side: 'buy' | 'sell', amount: number, price: number): void {
   const opposite = side === 'buy' ? 'sell' : 'buy'

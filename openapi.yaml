@@ -63,7 +63,13 @@ paths:
           example: FIKA
       responses:
         '200':
-          description: Orderbok med bids och asks
+          description: |
+            Orderbok med bids (högst pris först) och asks (lägst pris först), högst tio nivåer
+            per sida, aggregerade per pris. `marketMaker` är sann när Marvin har en order på nivån.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Orderbook'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
@@ -164,7 +170,9 @@ paths:
       tags: [market]
       summary: SSE market feed
       description: |
-        Server-Sent Events stream. Events: `connected`, `price`, `trade`.
+        Server-Sent Events stream. Events: `connected`, `price`, `trade`, `orderbook`.
+        `orderbook` har samma form som `GET /assets/{id}/orderbook` plus `timestamp`, och skickas
+        när en tokens orderbok har ändrats (som oftast en gång i sekunden per token).
       responses:
         '200':
           description: SSE stream
@@ -248,6 +256,37 @@ components:
       in: header
       name: X-Api-Key
       description: 'Studentens API-nyckel. Kan även skickas som query-parameter: ?api_key=<key>'
+
+  schemas:
+    BookLevel:
+      type: object
+      properties:
+        price:
+          type: number
+          example: 10.2
+        amount:
+          type: integer
+          example: 490
+        side:
+          type: string
+          enum: [buy, sell]
+        marketMaker:
+          type: boolean
+          example: true
+    Orderbook:
+      type: object
+      properties:
+        token:
+          type: string
+          example: FIKA
+        bids:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookLevel'
+        asks:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookLevel'
 
   responses:
     TooManyRequests:

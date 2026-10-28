@@ -158,12 +158,16 @@ Sex tokens i tre kategorier:
   Marvin-order flyttar priset en fjärdedel av avståndet).
 - **Prisband:** `POST /orders` nekar (400) ordrar mer än `PRICE_BAND_PCT` (10 %) från
   referenspriset, så två studenter kan inte flytta marknaden med en affär till ett påhittat pris.
-- **Marvin** (`MARKET_MAKER_ACRONYM`, `marvin`) lägger varje sekund ett köp och ett sälj per token,
-  ±2 % kring referenspriset, värda ca 5 000 kr vardera. Han tar aldrig en students order: korsar
-  hans pris en students vilande order hoppar han över den sidan. Han går inte igenom
+- **Marvin** (`MARKET_MAKER_ACRONYM`, `marvin`) lägger varje sekund en stege per token och sida:
+  `MARKET_MAKER_LEVELS` (5) nivåer, den första ±2 % kring referenspriset och värd ca 5 000 kr,
+  varje nästa `MARKET_MAKER_LEVEL_STEP_PCT` (1 %) längre ut och en halv order större. Han tar
+  aldrig en students order: korsar en nivå en students vilande order hoppar han över den nivån. Han går inte igenom
   saldokontrollen och kan blanka (negativt innehav), men slutar köpa eller sälja en token när
   positionen passerar `MARKET_MAKER_MAX_POSITION_VALUE` (50 000 kr). Han syns på leaderboarden
   (`marketMaker: true`); hans vinst eller förlust är värdet minus startkapitalet 100 000.
+- **SSE `orderbook`:** efter varje svep skickas orderboken (`token`, `bids`, `asks`, `timestamp`;
+  samma nivåer som `GET /assets/:id/orderbook`, med `marketMaker` per nivå) för de tokens vars
+  bok har ändrats. Klienter följer boken utan att polla REST-endpointen.
 
 ## Lokal mock (i student-skeletonen)
 

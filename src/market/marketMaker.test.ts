@@ -14,6 +14,18 @@ function mmOrders(token: string): OrderRow[] {
     .all(MM, token) as OrderRow[]
 }
 
+/** The market maker's best bid and best ask: the levels closest to the reference price. */
+function bestQuotes(token: string): { bid: OrderRow; ask: OrderRow } {
+  const orders = mmOrders(token)
+  const bids = orders.filter((o) => o.side === 'buy').sort((a, b) => b.price - a.price)
+  const asks = orders.filter((o) => o.side === 'sell').sort((a, b) => a.price - b.price)
+  return { bid: bids[0], ask: asks[0] }
+}
+
+function sides(token: string): string[] {
+  return [...new Set(mmOrders(token).map((o) => o.side))]
+}
+
 beforeEach(() => {
   db.prepare('DELETE FROM orders').run()
   db.prepare('DELETE FROM trades').run()
@@ -26,13 +38,24 @@ describe('runMarketMakerSweep', () => {
   it('quotes a two-sided book around the reference price', () => {
     runMarketMakerSweep()
 
-    const [buy, sell] = mmOrders('FIKA')
-    expect(buy.side).toBe('buy')
-    expect(sell.side).toBe('sell')
-    expect(buy.price).toBeLessThan(10.0)
-    expect(sell.price).toBeGreaterThan(10.0)
-    expect(buy.remaining).toBe(quoteAmount(10.0))
-    expect(sell.remaining).toBe(quoteAmount(10.0))
+    const { bid, ask } = bestQuotes('FIKA')
+    expect(bid.price).toBeLessThan(10.0)
+    expect(ask.price).toBeGreaterThan(10.0)
+    expect(bid.remaining).toBe(quoteAmount(10.0))
+    expect(ask.remaining).toBe(quoteAmount(10.0))
+  })
+
+  it('quotes a ladder: each level further out and larger', () => {
+    runMarketMakerSweep()
+
+    const asks = mmOrders('FIKA')
+      .filter((o) => o.side === 'sell')
+      .sort((a, b) => a.price - b.price)
+    expect(asks).toHaveLength(env.MARKET_MAKER_LEVELS)
+    for (let i = 1; i < asks.length; i++) {
+      expect(asks[i].price).toBeGreaterThan(asks[i - 1].price)
+      expect(asks[i].remaining).toBeGreaterThan(asks[i - 1].remaining)
+    }
   })
 
   it('sizes each quote by value, so cheap tokens get more units', () => {
@@ -45,7 +68,7 @@ describe('runMarketMakerSweep', () => {
     runMarketMakerSweep()
     runMarketMakerSweep()
 
-    expect(mmOrders('FIKA')).toHaveLength(2)
+    expect(mmOrders('FIKA')).toHaveLength(2 * env.MARKET_MAKER_LEVELS)
   })
 
   it('registers the market maker as a visible student', () => {
@@ -73,7 +96,7 @@ describe('runMarketMakerSweep', () => {
 
   it('fills a student order that crosses the MM quote', () => {
     runMarketMakerSweep()
-    const [, mmSell] = mmOrders('FIKA')
+    const mmSell = bestQuotes('FIKA').ask
 
     placeAndMatch('order-cross', {
       acronym: 'aaa',
@@ -107,12 +130,36 @@ describe('runMarketMakerSweep', () => {
       .prepare('SELECT * FROM orders WHERE id = ?')
       .get('order-cheap-sell') as OrderRow
     expect(order.status).toBe('open')
-    expect(mmOrders('FIKA').map((o) => o.side)).toEqual(['sell'])
+    expect(sides('FIKA')).toEqual(['sell'])
+  })
+
+  it('skips only the levels that would cross a student order', () => {
+    runMarketMakerSweep()
+    const bids = mmOrders('FIKA')
+      .filter((o) => o.side === 'buy')
+      .sort((a, b) => b.price - a.price)
+    // A student sell between the second and third bid crosses the two best ones
+    // (the market maker's quotes are removed first, or the sell would fill against them)
+    const price = +((bids[1].price + bids[2].price) / 2).toFixed(2)
+    db.prepare(`DELETE FROM orders WHERE acronym = ?`).run(MM)
+    placeAndMatch('order-between', {
+      acronym: 'aaa',
+      token: 'FIKA',
+      side: 'sell',
+      amount: 1,
+      price,
+    })
+
+    runMarketMakerSweep()
+
+    const left = mmOrders('FIKA').filter((o) => o.side === 'buy')
+    expect(left).toHaveLength(env.MARKET_MAKER_LEVELS - 2)
+    expect(Math.max(...left.map((o) => o.price))).toBeLessThan(price)
   })
 
   it('goes short when it sells more than it holds', () => {
     runMarketMakerSweep()
-    const [, mmSell] = mmOrders('FIKA')
+    const mmSell = bestQuotes('FIKA').ask
 
     placeAndMatch('order-buy', {
       acronym: 'aaa',
@@ -139,6 +186,6 @@ describe('runMarketMakerSweep', () => {
 
     runMarketMakerSweep()
 
-    expect(mmOrders('FIKA').map((o) => o.side)).toEqual(['sell'])
+    expect(sides('FIKA')).toEqual(['sell'])
   })
 })

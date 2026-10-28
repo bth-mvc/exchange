@@ -11,6 +11,8 @@ const schema = z.object({
   MARKET_MAKER_SWEEP_INTERVAL_MS: z.coerce.number().default(1000),
   MARKET_MAKER_ACRONYM: z.string().min(1).default('marvin'),
   MARKET_MAKER_SPREAD_PCT: z.coerce.number().default(0.02),
+  MARKET_MAKER_LEVELS: z.coerce.number().int().min(1).default(5),
+  MARKET_MAKER_LEVEL_STEP_PCT: z.coerce.number().default(0.01),
   MARKET_MAKER_QUOTE_VALUE: z.coerce.number().default(5000),
   MARKET_MAKER_MAX_POSITION_VALUE: z.coerce.number().default(50_000),
   PRICE_BAND_PCT: z.coerce.number().default(0.1),

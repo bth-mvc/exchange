@@ -84,7 +84,7 @@ describe('GET /assets/:id/orderbook', () => {
     await flush()
 
     const res = await request(app).get('/assets/FIKA/orderbook').set('X-Api-Key', 'any')
-    expect(res.body.bids).toEqual([{ price: 9.5, amount: 5, side: 'buy' }])
+    expect(res.body.bids).toEqual([{ price: 9.5, amount: 5, side: 'buy', marketMaker: false }])
     expect(res.body.asks).toEqual([])
   })
 
@@ -106,7 +106,7 @@ describe('GET /assets/:id/orderbook', () => {
     await flush()
 
     const res = await request(app).get('/assets/MEME/orderbook').set('X-Api-Key', 'any')
-    expect(res.body.bids).toEqual([{ price: 0.65, amount: 150, side: 'buy' }])
+    expect(res.body.bids).toEqual([{ price: 0.65, amount: 150, side: 'buy', marketMaker: false }])
   })
 
   it('returns 404 for unknown token', async () => {
