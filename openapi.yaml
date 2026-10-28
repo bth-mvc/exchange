@@ -9,8 +9,8 @@ info:
   version: '1.4.0'
 
 servers:
-  - url: http://localhost:4000
-    description: Lokal dev
+  - url: /
+    description: Samma server som visar dokumentationen
 
 security:
   - apiKey: []
