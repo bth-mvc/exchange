@@ -547,6 +547,44 @@ describe('GET /market/feed', () => {
   })
 })
 
+describe('GET /market/news', () => {
+  beforeEach(() => {
+    db.prepare('DELETE FROM news').run()
+    const insert = db.prepare(
+      `INSERT INTO news (id, token, sentiment, impact, headline, pct, duration_sec, timestamp)
+       VALUES (?, ?, 'positive', ?, 'x', ?, ?, ?)`,
+    )
+    insert.run('n1', 'YOLO', 'low', null, null, '2026-10-28T10:00:00.000Z')
+    insert.run('n2', 'YOLO', 'big', 15, 180, '2026-10-28T11:00:00.000Z')
+  })
+
+  it('returns stored news, newest first, with pct and durationSec on big events', async () => {
+    const res = await request(app).get('/market/news')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual([
+      expect.objectContaining({ id: 'n2', impact: 'big', pct: 15, durationSec: 180 }),
+      {
+        id: 'n1',
+        token: 'YOLO',
+        sentiment: 'positive',
+        impact: 'low',
+        headline: 'x',
+        timestamp: '2026-10-28T10:00:00.000Z',
+      },
+    ])
+  })
+
+  it('filters by impact and token', async () => {
+    expect((await request(app).get('/market/news?impact=big')).body).toHaveLength(1)
+    expect((await request(app).get('/market/news?token=meme')).body).toHaveLength(0)
+  })
+
+  it('refuses an unknown token or impact', async () => {
+    expect((await request(app).get('/market/news?token=NOPE')).status).toBe(404)
+    expect((await request(app).get('/market/news?impact=huge')).status).toBe(400)
+  })
+})
+
 describe('GET /orders and DELETE /orders/:id', () => {
   async function restingBuy(amount = 10, price = 9.5) {
     const res = await request(app)

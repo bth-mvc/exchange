@@ -5,6 +5,7 @@ import { env } from '../config/env.js'
 
 const { placeAndMatch } = await import('./matching.js')
 const { runMarketMakerSweep, quoteAmount } = await import('./marketMaker.js')
+const { getToken } = await import('./tokens.js')
 
 const MM = env.MARKET_MAKER_ACRONYM
 
@@ -56,6 +57,19 @@ describe('runMarketMakerSweep', () => {
       expect(asks[i].price).toBeGreaterThan(asks[i - 1].price)
       expect(asks[i].remaining).toBeGreaterThan(asks[i - 1].remaining)
     }
+  })
+
+  it('quotes wider while a big news event moves the token', () => {
+    const hodl = getToken('HODL')!
+    runMarketMakerSweep()
+    const normal = bestQuotes('HODL')
+    hodl.inEvent = true
+    runMarketMakerSweep()
+    hodl.inEvent = false
+    const wide = bestQuotes('HODL')
+
+    const spread = (q: { bid: OrderRow; ask: OrderRow }) => q.ask.price - q.bid.price
+    expect(spread(wide)).toBeCloseTo(spread(normal) * env.MARKET_MAKER_EVENT_SPREAD_FACTOR)
   })
 
   it('sizes each quote by value, so cheap tokens get more units', () => {

@@ -65,6 +65,19 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_webhooks_pending ON webhooks (acronym, acked_at);
+
+  CREATE TABLE IF NOT EXISTS news (
+    id           TEXT PRIMARY KEY,
+    token        TEXT NOT NULL,
+    sentiment    TEXT NOT NULL,
+    impact       TEXT NOT NULL,
+    headline     TEXT NOT NULL,
+    pct          REAL,
+    duration_sec INTEGER,
+    timestamp    TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_news_timestamp ON news (timestamp);
 `)
 
 // Databases from before webhook secrets: add the column; ensureStudent fills it in.

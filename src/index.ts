@@ -4,10 +4,12 @@ import { logger } from './logger.js'
 import { runMarketMakerSweep } from './market/marketMaker.js'
 import { startPriceSimulator } from './market/simulator.js'
 import { broadcastOrderbooks } from './market/orderbook.js'
+import { startNewsFeed } from './market/news.js'
 
 app.listen(env.PORT, () => {
   logger.info(`Exchange running on http://localhost:${env.PORT}`)
   startPriceSimulator()
+  if (env.NEWS_ENABLED) startNewsFeed()
   setInterval(() => {
     runMarketMakerSweep()
     broadcastOrderbooks()

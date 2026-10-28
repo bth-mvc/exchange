@@ -7,8 +7,13 @@ export interface Token {
   /** Reference price: what the market shows, what the market maker quotes around and what
    *  holdings are valued at. Trades nudge it, they do not set it. */
   price: number
-  /** Where the price simulator pulls the reference price back to over time. */
+  /** Where the price simulator pulls the reference price back to over time. Big news events
+   *  move it, so a new level lasts; it drifts slowly back towards startPrice. */
   basePrice: number
+  /** The price the token started the course at. */
+  startPrice: number
+  /** True while a big news event moves the price; the market maker quotes wider meanwhile. */
+  inEvent?: boolean
 }
 
 export const tokens: Token[] = [
@@ -18,7 +23,7 @@ export const tokens: Token[] = [
   { id: 'DEPLOY', name: 'Deploy Token', type: 'volatile', price: 42.0 },
   { id: 'MEME', name: 'Meme Token', type: 'volatile', price: 0.69 },
   { id: 'HODL', name: 'Hodl Token', type: 'yield', price: 100.0 },
-].map((t) => ({ ...t, type: t.type as Token['type'], basePrice: t.price }))
+].map((t) => ({ ...t, type: t.type as Token['type'], basePrice: t.price, startPrice: t.price }))
 
 export function getToken(id: string): Token | undefined {
   return tokens.find((t) => t.id === id.toUpperCase())

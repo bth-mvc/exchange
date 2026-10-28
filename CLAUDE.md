@@ -50,6 +50,7 @@ plus `RateLimit-Limit` och `RateLimit-Remaining` på alla svar. Studenternas ret
 | `GET` | `/trades` | Handelshistorik med cursor-paginering |
 | `GET` | `/portfolio` | Studentens portfölj på börsen |
 | `GET` | `/leaderboard` | Rankningslista för alla användare |
+| `GET` | `/market/news?token=&impact=&limit=` | Sparade nyheter, nyast först (se Nyheter nedan) |
 | `GET` | `/webhooks/pending` | Okvitterade webhooks (polling) |
 | `POST` | `/webhooks/pending/ack` | Kvittera hanterade webhooks |
 | `GET` | `/webhooks/secret` | Studentens webhook-hemlighet |
@@ -136,7 +137,7 @@ HMAC-signatur beräknas med `sha256` över hela JSON-strängen.
 GET /market/feed
 ```
 
-SSE-stream med fyra eventtyper:
+SSE-stream med fem eventtyper:
 
 | Event | Data |
 |---|---|
@@ -144,6 +145,7 @@ SSE-stream med fyra eventtyper:
 | `price` | `{ token, price, timestamp }` — var 3:e sekund |
 | `trade` | `{ buyOrderId, sellOrderId, token, side, amount, price, total, timestamp }` — vid matchad order; order-id:n låter en server känna igen sina egna affärer utan att få veta motparten |
 | `orderbook` | `{ token, bids, asks, timestamp }` — när en tokens orderbok ändrats, se Marvin nedan |
+| `news` | `{ id, token, sentiment, impact, headline, pct?, durationSec?, timestamp }` — se Nyheter nedan |
 
 ## Tokens
 
@@ -162,7 +164,9 @@ Sex tokens i tre kategorier:
 
 - **Referenspris** (`token.price`): det marknaden visar, det Marvin lägger sina ordrar kring och det
   innehav värderas till på leaderboarden. Prissimulatorn slumpar det ±2 % och drar det sakta
-  tillbaka mot startpriset (`PRICE_REVERSION`). En affär sätter det inte, den knuffar det en bit
+  tillbaka mot baspriset (`PRICE_REVERSION`). Baspriset är startpriset tills en stor nyhet
+  flyttar det, och dras i sin tur mycket sakta tillbaka mot startpriset (`BASE_REVERSION`).
+  Priser och baspriser sparas inte: en omstart börjar om från startpriserna. En affär sätter det inte, den knuffar det en bit
   mot affärens pris, mer ju större affären är (`PRICE_IMPACT`, en affär värd en hel
   Marvin-order flyttar priset en fjärdedel av avståndet).
 - **Prisband:** `POST /orders` nekar (400) ordrar mer än `PRICE_BAND_PCT` (10 %) från
@@ -177,6 +181,26 @@ Sex tokens i tre kategorier:
 - **SSE `orderbook`:** efter varje svep skickas orderboken (`token`, `bids`, `asks`, `timestamp`;
   samma nivåer som `GET /assets/:id/orderbook`, med `marketMaker` per nivå) för de tokens vars
   bok har ändrats. Klienter följer boken utan att polla REST-endpointen.
+
+## Nyheter
+
+Ett fejkat nyhetsflöde (`src/market/news.ts`) ger prisrörelserna en förklaring och en bot något
+att reagera på. Varje nyhet skickas som SSE `news` och sparas i tabellen `news`
+(`GET /market/news`).
+
+| | Vanlig nyhet | Stor händelse |
+|---|---|---|
+| Takt | ca var `NEWS_INTERVAL_MS` (10 min) totalt, högst en per token och `NEWS_TOKEN_GAP_MS` (1 h); volatila oftast | ca var `BIG_EVENT_INTERVAL_MS` (4 h), aldrig stable |
+| `impact` | `low`/`medium`/`high`: 1/2/3 % (neutral flyttar inget) | `rumor`, sedan `big` med `pct` och `durationSec` |
+| Flyttar | referenspriset under `NEWS_RAMP_MS` (10 s), sedan dras det tillbaka | referenspriset och baspriset 10–25 % under `BIG_EVENT_RAMP_MS` (3 min) |
+| Sparas | `NEWS_KEEP_DAYS` (1) | `BIG_EVENT_KEEP_DAYS` (60) |
+
+- **Rykte:** `RUMOR_LEAD_MS` (3 min) före en stor händelse, rätt riktning i `RUMOR_ACCURACY`
+  (75 %) av fallen.
+- **Riktning:** lutar tillbaka mot startpriset (ju längre bort, desto troligare tillbaka), och
+  baspriset hålls inom 0,5–2 × startpriset. Ingen token dör eller skenar.
+- **Marvin under en ramp:** spreaden är `MARKET_MAKER_EVENT_SPREAD_FACTOR` (2,5) gånger bredare.
+- `NEWS_ENABLED=false` stänger av flödet. Med många aktiva studenter kan takten ökas.
 
 ## Lokal mock (i student-skeletonen)
 
@@ -226,6 +250,7 @@ Om api-servern inte svarar och nyckeln inte finns i cachen → returnera `401 Un
 | `KEY_CACHE_TTL_MS` | `86400000` | Cache-TTL i ms (default 24h) |
 | `RATE_LIMIT_MAX` | `120` | Max antal anrop per student och fönster |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | Rate limit-fönstrets längd i ms |
+| `NEWS_ENABLED`, `NEWS_*`, `BIG_EVENT_*`, `RUMOR_*`, `BASE_REVERSION`, `MARKET_MAKER_EVENT_SPREAD_FACTOR` | se `src/config/env.ts` | Nyhetsflödet, se Nyheter ovan |
 
 ## API-dokumentation
 

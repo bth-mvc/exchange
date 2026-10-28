@@ -13,7 +13,8 @@ const MM_ACRONYM = env.MARKET_MAKER_ACRONYM
  *  is worth about MARKET_MAKER_QUOTE_VALUE, so a cheap token gets many units and an expensive one
  *  few, and every token offers the same liquidity in money. The market maker only provides
  *  liquidity: it never takes a student's order, and it stops adding to a position that has grown
- *  past MARKET_MAKER_MAX_POSITION_VALUE in either direction. */
+ *  past MARKET_MAKER_MAX_POSITION_VALUE in either direction. While a big news event moves a
+ *  token, the spread is MARKET_MAKER_EVENT_SPREAD_FACTOR wider, so the ramp does not eat it up. */
 export function runMarketMakerSweep(): void {
   ensureStudent(MM_ACRONYM)
   db.prepare(`DELETE FROM orders WHERE acronym = ? AND status = 'open'`).run(MM_ACRONYM)
@@ -24,7 +25,9 @@ export function runMarketMakerSweep(): void {
 
     for (let level = 0; level < env.MARKET_MAKER_LEVELS; level++) {
       const spread =
-        token.price * (env.MARKET_MAKER_SPREAD_PCT + level * env.MARKET_MAKER_LEVEL_STEP_PCT)
+        token.price *
+        (env.MARKET_MAKER_SPREAD_PCT + level * env.MARKET_MAKER_LEVEL_STEP_PCT) *
+        (token.inEvent ? env.MARKET_MAKER_EVENT_SPREAD_FACTOR : 1)
       const size = Math.round(amount * (1 + level / 2))
       if (position < env.MARKET_MAKER_MAX_POSITION_VALUE) {
         quote(token.id, 'buy', size, +(token.price - spread).toFixed(2))

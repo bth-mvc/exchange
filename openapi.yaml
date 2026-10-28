@@ -214,10 +214,11 @@ paths:
       tags: [market]
       summary: SSE market feed
       description: |
-        Server-Sent Events stream. Events: `connected`, `price`, `trade`, `orderbook`.
+        Server-Sent Events stream. Events: `connected`, `price`, `trade`, `orderbook`, `news`.
         `trade` har `buyOrderId` och `sellOrderId`, så att en server känner igen sina egna affärer.
         `orderbook` har samma form som `GET /assets/{id}/orderbook` plus `timestamp`, och skickas
         när en tokens orderbok har ändrats (som oftast en gång i sekunden per token).
+        `news` har samma form som en post i `GET /market/news`.
       responses:
         '200':
           description: SSE stream
@@ -227,6 +228,51 @@ paths:
                 type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /market/news:
+    get:
+      tags: [market]
+      summary: Sparade nyheter, nyast först
+      description: |
+        Samma poster som `news`-eventet i feeden. Vanliga nyheter (`low`/`medium`/`high`) sparas
+        ett dygn, rykten (`rumor`) och stora händelser (`big`) i 60 dagar, så att en graf kan
+        visa dem som markörer.
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 500
+        - name: token
+          in: query
+          schema:
+            type: string
+          example: YOLO
+        - name: impact
+          in: query
+          description: Kommaseparerad lista, t.ex. `big` eller `rumor,big`
+          schema:
+            type: string
+          example: big
+      responses:
+        '200':
+          description: Nyheter, nyast först
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/News'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
 
@@ -334,6 +380,41 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BookLevel'
+
+    News:
+      type: object
+      required: [id, token, sentiment, impact, headline, timestamp]
+      properties:
+        id:
+          type: string
+          example: news-1793227891411-p7
+        token:
+          type: string
+          example: HODL
+        sentiment:
+          type: string
+          enum: [positive, negative, neutral]
+        impact:
+          type: string
+          enum: [low, medium, high, rumor, big]
+          description: |
+            `low`/`medium`/`high` knuffar priset ca 1/2/3 % i några sekunder, sedan dras det
+            tillbaka. `rumor` kommer några minuter före en stor händelse och har rätt riktning i
+            ca 75 % av fallen. `big` flyttar priset och dess nivå 10–25 % under en ramp.
+        headline:
+          type: string
+          example: 'BREAKING: HODL becomes official payment option at a big retailer'
+        pct:
+          type: number
+          description: Bara för `big`, planerad förändring i procent
+          example: 24.3
+        durationSec:
+          type: integer
+          description: Bara för `big`, hur länge rampen pågår
+          example: 180
+        timestamp:
+          type: string
+          format: date-time
 
   responses:
     TooManyRequests:
