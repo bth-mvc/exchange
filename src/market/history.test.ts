@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { db } from '../db.js'
-import { recordPrices, loadTokenState, priceHistory } from './history.js'
+import { recordPrices, recordValues, loadTokenState, priceHistory } from './history.js'
 import { tokens, getToken } from './tokens.js'
 
 const original = tokens.map((t) => ({ ...t }))
@@ -69,5 +69,23 @@ describe('loadTokenState', () => {
     expect(yolo.price).toBe(5.5)
     expect(yolo.basePrice).toBe(5.25)
     expect(yolo.startPrice).toBe(4.2)
+  })
+})
+
+describe('recordValues', () => {
+  it('saves each student value once a day, at the first sample', () => {
+    db.prepare('DELETE FROM students').run()
+    db.prepare('DELETE FROM holdings').run()
+    db.prepare('DELETE FROM value_days').run()
+    db.prepare(`INSERT INTO students (acronym, balance) VALUES ('val', 1000)`).run()
+    db.prepare(`INSERT INTO holdings (acronym, token, amount) VALUES ('val', 'FIKA', 10)`).run()
+
+    recordValues(new Date('2026-10-28T00:00:05Z'))
+    db.prepare(`UPDATE students SET balance = 0 WHERE acronym = 'val'`).run()
+    recordValues(new Date('2026-10-28T12:00:00Z'))
+
+    expect(db.prepare(`SELECT day, value FROM value_days`).all()).toEqual([
+      { day: '2026-10-28', value: 1100 },
+    ])
   })
 })

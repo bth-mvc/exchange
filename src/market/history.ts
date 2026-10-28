@@ -1,6 +1,7 @@
 import { db } from '../db.js'
 import { env } from '../config/env.js'
-import { tokens } from './tokens.js'
+import type { StudentRow } from '../db.js'
+import { tokens, currentPrice } from './tokens.js'
 
 export type Range = '10m' | '1d' | '30d'
 export const ranges: Range[] = ['10m', '1d', '30d']
@@ -33,6 +34,28 @@ export function recordPrices(now = new Date()): void {
     db.prepare(`DELETE FROM price_ticks WHERE timestamp < ?`).run(
       new Date(now.getTime() - 86_400_000).toISOString(),
     )
+  })()
+}
+
+/** A student's balance plus holdings at the current prices. */
+export function studentValue(student: StudentRow): number {
+  const holdings = db
+    .prepare(`SELECT token, amount FROM holdings WHERE acronym = ? AND amount != 0`)
+    .all(student.acronym) as { token: string; amount: number }[]
+  return student.balance + holdings.reduce((sum, h) => sum + h.amount * currentPrice(h.token), 0)
+}
+
+/** Saves every student's value once a day, the first time this runs that day, so the
+ *  leaderboard can tell how much each one has grown since a given day. */
+export function recordValues(now = new Date()): void {
+  const day = now.toISOString().slice(0, 10)
+  if (db.prepare(`SELECT 1 FROM value_days WHERE day = ? LIMIT 1`).get(day)) return
+  const insert = db.prepare(
+    `INSERT OR IGNORE INTO value_days (acronym, day, value) VALUES (?, ?, ?)`,
+  )
+  const students = db.prepare(`SELECT * FROM students`).all() as StudentRow[]
+  db.transaction(() => {
+    for (const s of students) insert.run(s.acronym, day, studentValue(s))
   })()
 }
 
@@ -85,9 +108,14 @@ export function priceHistory(token: string, range: Range, now = new Date()): Pri
     .all(token, from) as PricePoint[]
 }
 
-/** Loads the saved prices and records them every HISTORY_SAMPLE_MS. */
+/** Loads the saved prices and records them every HISTORY_SAMPLE_MS, and each student's value
+ *  once a day. */
 export function startHistory(): void {
   loadTokenState()
-  recordPrices()
-  setInterval(() => recordPrices(), env.HISTORY_SAMPLE_MS)
+  const sample = () => {
+    recordPrices()
+    recordValues()
+  }
+  sample()
+  setInterval(sample, env.HISTORY_SAMPLE_MS)
 }

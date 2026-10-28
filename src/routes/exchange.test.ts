@@ -52,6 +52,7 @@ beforeEach(async () => {
   db.prepare('DELETE FROM holdings').run()
   db.prepare('DELETE FROM students').run()
   db.prepare('DELETE FROM webhooks').run()
+  db.prepare('DELETE FROM value_days').run()
 })
 
 describe('GET /assets', () => {
@@ -531,8 +532,48 @@ describe('GET /leaderboard', () => {
     const seller = entries.find((e) => e.acronym === 'lba')
     const buyer = entries.find((e) => e.acronym === 'lbb')
 
-    expect(seller).toMatchObject({ buys: 0, sells: 1 })
-    expect(buyer).toMatchObject({ buys: 1, sells: 0 })
+    expect(seller).toMatchObject({ buys: 0, sells: 1, turnover: 100 })
+    expect(buyer).toMatchObject({ buys: 1, sells: 0, turnover: 100 })
+  })
+
+  it('with since, counts only later trades and ranks by growth since that day', async () => {
+    db.prepare(
+      `INSERT INTO students (acronym, balance) VALUES ('big', 150000), ('small', 60000)`,
+    ).run()
+    db.prepare(
+      `INSERT INTO value_days (acronym, day, value) VALUES
+         ('big', '2026-10-20', 140000), ('big', '2026-10-26', 160000), ('small', '2026-10-26', 50000)`,
+    ).run()
+    db.prepare(
+      `INSERT INTO trades (id, acronym, token, side, amount, price, total, timestamp) VALUES
+         ('t1', 'big', 'FIKA', 'buy', 10, 10, 100, '2026-10-21T10:00:00.000Z'),
+         ('t2', 'big', 'FIKA', 'sell', 10, 10, 100, '2026-10-27T10:00:00.000Z')`,
+    ).run()
+
+    const all = (await request(app).get('/leaderboard')).body
+    expect(all.map((e: { acronym: string }) => e.acronym)).toEqual(['big', 'small'])
+    expect(all[0]).toMatchObject({ buys: 1, sells: 1, turnover: 200 })
+    expect(all[0]).not.toHaveProperty('changePct')
+
+    const week = (await request(app).get('/leaderboard?since=2026-10-26')).body
+    expect(week[0]).toMatchObject({ rank: 1, acronym: 'small', startValue: 50000, changePct: 20 })
+    expect(week[1]).toMatchObject({
+      acronym: 'big',
+      buys: 0,
+      sells: 1,
+      turnover: 100,
+      changePct: -6.25,
+    })
+  })
+
+  it('without a snapshot, since compares with the starting balance', async () => {
+    db.prepare(`INSERT INTO students (acronym, balance) VALUES ('new', 110000)`).run()
+    const res = await request(app).get('/leaderboard?since=2026-10-26')
+    expect(res.body[0]).toMatchObject({ startValue: 100000, changePct: 10 })
+  })
+
+  it('refuses a since that is not a date', async () => {
+    expect((await request(app).get('/leaderboard?since=last-week')).status).toBe(400)
   })
 })
 

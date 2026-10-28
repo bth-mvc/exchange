@@ -94,6 +94,13 @@ db.exec(`
     PRIMARY KEY (token, day)
   );
 
+  CREATE TABLE IF NOT EXISTS value_days (
+    acronym TEXT NOT NULL,
+    day     TEXT NOT NULL,
+    value   REAL NOT NULL,
+    PRIMARY KEY (acronym, day)
+  );
+
   CREATE TABLE IF NOT EXISTS token_state (
     token      TEXT PRIMARY KEY,
     price      REAL NOT NULL,

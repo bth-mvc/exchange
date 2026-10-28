@@ -50,7 +50,7 @@ plus `RateLimit-Limit` och `RateLimit-Remaining` på alla svar. Studenternas ret
 | `DELETE` | `/orders/:id` | Avbryt en egen öppen order (404 annans/okänd, 409 ej öppen) |
 | `GET` | `/trades` | Handelshistorik med cursor-paginering |
 | `GET` | `/portfolio` | Studentens portfölj på börsen |
-| `GET` | `/leaderboard` | Rankningslista för alla användare |
+| `GET` | `/leaderboard?since=YYYY-MM-DD` | Rankningslista, med `turnover`; med `since` periodens affärer, `startValue` och `changePct`, rankad på `changePct` |
 | `GET` | `/market/news?token=&impact=&limit=` | Sparade nyheter, nyast först (se Nyheter nedan) |
 | `GET` | `/webhooks/pending` | Okvitterade webhooks (polling) |
 | `POST` | `/webhooks/pending/ack` | Kvittera hanterade webhooks |
@@ -171,7 +171,8 @@ Sex tokens i tre kategorier:
   fortsätter där marknaden var. `/assets` visar bara `id`, `name`, `type` och `price`: baspriset
   säger vart priset är på väg och ska inte ges bort till en bot.
 - **Historik:** samma sampling sparar en tick per token i `price_ticks` (ett dygn) och dagens
-  stängningspris i `price_days` (för alltid), för `GET /assets/:id/history`. En affär sätter det inte, den knuffar det en bit
+  stängningspris i `price_days` (för alltid), för `GET /assets/:id/history`. Första samplingen
+  varje dygn (UTC) sparar också varje students värde i `value_days`, för `/leaderboard?since=`. En affär sätter det inte, den knuffar det en bit
   mot affärens pris, mer ju större affären är (`PRICE_IMPACT`, en affär värd en hel
   Marvin-order flyttar priset en fjärdedel av avståndet).
 - **Prisband:** `POST /orders` nekar (400) ordrar mer än `PRICE_BAND_PCT` (10 %) från

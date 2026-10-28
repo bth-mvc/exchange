@@ -257,9 +257,27 @@ paths:
     get:
       tags: [leaderboard]
       summary: Rankningslista sorterad på portföljvärde
+      description: |
+        Alla, även Marvin (`marketMaker: true`). Varje post: `rank`, `acronym`, `marketMaker`,
+        `totalValue`, `buys`, `sells`, `turnover` (summan av alla affärers belopp, köp plus
+        sälj), `lastTradeAt`, `registeredAt`.
+
+        Med `since` räknas `buys`, `sells` och `turnover` bara från den dagen, och varje post
+        får `startValue` (värdet när dagen började, eller startkapitalet 100 000 för den som
+        kom senare) och `changePct`. Listan rankas då på `changePct`, t.ex. för en veckoliga.
+      parameters:
+        - name: since
+          in: query
+          description: Datum, YYYY-MM-DD (UTC)
+          schema:
+            type: string
+            format: date
+          example: '2026-10-26'
       responses:
         '200':
           description: Rankad lista med alla studenter
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
