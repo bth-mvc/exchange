@@ -117,6 +117,50 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+    get:
+      tags: [orders]
+      summary: Egna ordrar med status, nyast först
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, filled, cancelled]
+            default: open
+      responses:
+        '200':
+          description: 'Upp till 100 ordrar: [{ id, userId?, token, side, amount, remaining, price, status, createdAt }]'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /orders/{id}:
+    delete:
+      tags: [orders]
+      summary: Avbryt en egen öppen order
+      description: |
+        Den del som inte fyllts släpps (reservationen av saldo eller tokens försvinner), och en
+        `order.cancelled`-webhook läggs i kön.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Den avbrutna ordern: { id, token, side, amount, remaining, price, status: "cancelled", createdAt }'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Ordern är inte öppen (redan fylld eller avbruten)
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /trades:
     get:
@@ -171,6 +215,7 @@ paths:
       summary: SSE market feed
       description: |
         Server-Sent Events stream. Events: `connected`, `price`, `trade`, `orderbook`.
+        `trade` har `buyOrderId` och `sellOrderId`, så att en server känner igen sina egna affärer.
         `orderbook` har samma form som `GET /assets/{id}/orderbook` plus `timestamp`, och skickas
         när en tokens orderbok har ändrats (som oftast en gång i sekunden per token).
       responses:
@@ -209,6 +254,8 @@ paths:
         `body` (exakt den sträng som signerats), `signature` (`sha256=<hex>`, samma
         värde som headern `X-Webhook-Signature` vid push) och `id`. En post
         returneras tills den kvitterats med POST /webhooks/pending/ack.
+        Event: `order.filled` (en fyllnad; `remaining` och `status` visar om ordern är helt
+        fylld eller fortfarande öppen) och `order.cancelled` (ordern avbröts).
       parameters:
         - name: limit
           in: query

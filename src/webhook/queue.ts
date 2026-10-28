@@ -24,16 +24,11 @@ export function getWebhookSecret(acronym: string): string {
 }
 
 /**
- * Queues an `order.filled` webhook for the order's student. Nothing is pushed:
- * a student's server is usually not reachable from the internet, so it polls
- * GET /webhooks/pending and acks what it has handled.
+ * Queues a webhook for the order's student. Nothing is pushed: a student's server is usually
+ * not reachable from the internet, so it polls GET /webhooks/pending and acks what it has
+ * handled. The market maker gets no webhooks.
  */
-export function enqueueOrderFilled(
-  order: OrderRow,
-  amount: number,
-  price: number,
-  timestamp: string,
-): void {
+function enqueue(order: OrderRow, event: string, data: object, timestamp: string): void {
   if (order.acronym === env.MARKET_MAKER_ACRONYM) {
     return
   }
@@ -41,15 +36,13 @@ export function enqueueOrderFilled(
   const id = nextId('wh')
   const body = JSON.stringify({
     id,
-    event: 'order.filled',
+    event,
     data: {
       orderId: order.id,
       ...(order.user_id && { userId: order.user_id }),
       token: order.token,
       side: order.side,
-      amount,
-      price,
-      total: amount * price,
+      ...data,
     },
     timestamp,
   })
@@ -60,6 +53,32 @@ export function enqueueOrderFilled(
     order.acronym,
     body,
     signature,
+  )
+}
+
+/** `order.filled` for one fill. `remaining` and `status` tell whether the order is now filled
+ *  or still open with a part left (a partial fill). */
+export function enqueueOrderFilled(
+  order: OrderRow,
+  amount: number,
+  price: number,
+  timestamp: string,
+): void {
+  enqueue(
+    order,
+    'order.filled',
+    { amount, price, total: amount * price, remaining: order.remaining, status: order.status },
+    timestamp,
+  )
+}
+
+/** `order.cancelled` when an open order is cancelled; `remaining` is the part that never filled. */
+export function enqueueOrderCancelled(order: OrderRow, timestamp: string): void {
+  enqueue(
+    order,
+    'order.cancelled',
+    { amount: order.amount, price: order.price, remaining: order.remaining, status: 'cancelled' },
+    timestamp,
   )
 }
 

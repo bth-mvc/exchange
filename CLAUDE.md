@@ -45,6 +45,8 @@ plus `RateLimit-Limit` och `RateLimit-Remaining` på alla svar. Studenternas ret
 | `GET` | `/assets` | Lista alla tokens med aktuellt pris |
 | `GET` | `/assets/:id/orderbook` | Orderbok för en specifik token |
 | `POST` | `/orders` | Lägg en order (buy/sell) |
+| `GET` | `/orders?status=open` | Egna ordrar med status (`open`/`filled`/`cancelled`), nyast först, max 100 |
+| `DELETE` | `/orders/:id` | Avbryt en egen öppen order (404 annans/okänd, 409 ej öppen) |
 | `GET` | `/trades` | Handelshistorik med cursor-paginering |
 | `GET` | `/portfolio` | Studentens portfölj på börsen |
 | `GET` | `/leaderboard` | Rankningslista för alla användare |
@@ -88,7 +90,7 @@ GET /trades?limit=20&cursor=trade-abc123
 
 ### HMAC-webhooks
 
-När en studentorder fylls (helt eller delvis) lägger exchange en signerad webhook i en kö
+När en studentorder fylls (helt eller delvis) eller avbryts lägger exchange en signerad webhook i en kö
 per student (tabellen `webhooks`). **Exchange pushar ingenting** — studentens server kör
 oftast på `localhost` och går inte att nå från internet — utan studenten pollar:
 
@@ -114,11 +116,17 @@ Marknadsmakarens fyllnader köas inte. Kvitterade poster rensas efter 7 dagar.
     "side": "buy",
     "amount": 10,
     "price": 10.50,
-    "total": 105.0
+    "total": 105.0,
+    "remaining": 0,
+    "status": "filled"
   },
   "timestamp": "2026-06-01T10:23:45.000Z"
 }
 ```
+
+`remaining` och `status` skiljer en delfyllnad (`status: "open"`, `remaining > 0`) från en
+fylld order. `order.cancelled` har samma `data` men `amount`/`price` är orderns egna och
+`remaining` den del som aldrig fylldes.
 
 HMAC-signatur beräknas med `sha256` över hela JSON-strängen.
 
@@ -128,13 +136,14 @@ HMAC-signatur beräknas med `sha256` över hela JSON-strängen.
 GET /market/feed
 ```
 
-SSE-stream med två eventtyper:
+SSE-stream med fyra eventtyper:
 
 | Event | Data |
 |---|---|
 | `connected` | `{ message: "Connected to market feed" }` |
 | `price` | `{ token, price, timestamp }` — var 3:e sekund |
-| `trade` | `{ token, side, amount, price, total, timestamp }` — vid matchad order |
+| `trade` | `{ buyOrderId, sellOrderId, token, side, amount, price, total, timestamp }` — vid matchad order; order-id:n låter en server känna igen sina egna affärer utan att få veta motparten |
+| `orderbook` | `{ token, bids, asks, timestamp }` — när en tokens orderbok ändrats, se Marvin nedan |
 
 ## Tokens
 

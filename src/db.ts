@@ -46,7 +46,7 @@ db.exec(`
     price          REAL NOT NULL,
     amount         INTEGER NOT NULL,
     remaining      INTEGER NOT NULL,
-    status         TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'filled')),
+    status         TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'filled', 'cancelled')),
     user_id        TEXT,
     webhook_url    TEXT,
     webhook_secret TEXT,
@@ -71,6 +71,30 @@ db.exec(`
 const studentColumns = db.prepare(`PRAGMA table_info(students)`).all() as { name: string }[]
 if (!studentColumns.some((c) => c.name === 'webhook_secret')) {
   db.exec(`ALTER TABLE students ADD COLUMN webhook_secret TEXT`)
+}
+
+// Databases from before cancel: the status CHECK does not allow 'cancelled'. SQLite cannot change
+// a CHECK, so the table is copied into a new one with the current definition.
+const ordersSql = (
+  db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'orders'`).get() as {
+    sql: string
+  }
+).sql
+if (!ordersSql.includes("'cancelled'")) {
+  db.transaction(() => {
+    db.exec(
+      ordersSql
+        .replace(/CREATE TABLE (IF NOT EXISTS )?orders/, 'CREATE TABLE orders_new')
+        .replace(
+          "CHECK (status IN ('open', 'filled'))",
+          "CHECK (status IN ('open', 'filled', 'cancelled'))",
+        ),
+    )
+    db.exec(`INSERT INTO orders_new SELECT * FROM orders`)
+    db.exec(`DROP TABLE orders`)
+    db.exec(`ALTER TABLE orders_new RENAME TO orders`)
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_orders_match ON orders (token, side, status, price)`)
+  })()
 }
 
 export interface StudentRow {

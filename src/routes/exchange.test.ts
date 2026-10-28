@@ -546,3 +546,98 @@ describe('GET /market/feed', () => {
     expect(res.status).toBe(401)
   })
 })
+
+describe('GET /orders and DELETE /orders/:id', () => {
+  async function restingBuy(amount = 10, price = 9.5) {
+    const res = await request(app)
+      .post('/orders')
+      .set('X-Api-Key', 'any')
+      .send({ token: 'FIKA', side: 'buy', amount, price })
+    await flush()
+    return res.body.id as string
+  }
+
+  function webhookBodies() {
+    return (db.prepare('SELECT body FROM webhooks ORDER BY rowid').all() as { body: string }[]).map(
+      (w) => JSON.parse(w.body) as { event: string; data: Record<string, unknown> },
+    )
+  }
+
+  it('lists the student own open orders', async () => {
+    const id = await restingBuy()
+    await mockStudent('other')
+    await request(app)
+      .post('/orders')
+      .set('X-Api-Key', 'o')
+      .send({ token: 'FIKA', side: 'buy', amount: 1, price: 9.4 })
+
+    const res = await request(app).get('/orders').set('X-Api-Key', 'any')
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0]).toMatchObject({ id, token: 'FIKA', remaining: 10, status: 'open' })
+  })
+
+  it('cancels an open order, releases its reservation and queues order.cancelled', async () => {
+    const id = await restingBuy(10_000, 9.5)
+    const before = await request(app)
+      .post('/orders')
+      .set('X-Api-Key', 'any')
+      .send({ token: 'FIKA', side: 'buy', amount: 10_000, price: 9.5 })
+    expect(before.status).toBe(400)
+
+    const res = await request(app).delete(`/orders/${id}`).set('X-Api-Key', 'any')
+    expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({ id, status: 'cancelled', remaining: 10_000 })
+
+    const after = await request(app)
+      .post('/orders')
+      .set('X-Api-Key', 'any')
+      .send({ token: 'FIKA', side: 'buy', amount: 10_000, price: 9.5 })
+    expect(after.status).toBe(201)
+    expect(webhookBodies().map((w) => w.event)).toEqual(['order.cancelled'])
+    expect(webhookBodies()[0].data).toMatchObject({ orderId: id, status: 'cancelled' })
+  })
+
+  it('answers 404 for another student order and 409 for one that is not open', async () => {
+    const id = await restingBuy()
+    await mockStudent('other')
+    const foreign = await request(app).delete(`/orders/${id}`).set('X-Api-Key', 'o')
+    expect(foreign.status).toBe(404)
+
+    await request(app).delete(`/orders/${id}`).set('X-Api-Key', 'any')
+    const again = await request(app).delete(`/orders/${id}`).set('X-Api-Key', 'any')
+    expect(again.status).toBe(409)
+  })
+
+  it('tells a partial fill from a complete one in order.filled', async () => {
+    const id = await restingBuy(10, 10.0)
+    await mockStudent('sss')
+    await request(app)
+      .post('/orders')
+      .set('X-Api-Key', 's')
+      .send({ token: 'FIKA', side: 'sell', amount: 4, price: 10.0 })
+    await flush()
+
+    const [filled] = webhookBodies().filter((w) => w.data.orderId === id)
+    expect(filled.data).toMatchObject({ amount: 4, remaining: 6, status: 'open' })
+  })
+
+  it('names the buy and sell order ids in the trade event', async () => {
+    const { addSseClient, removeSseClient } = await import('../market/simulator.js')
+    const client = fakeSseClient()
+    addSseClient(client)
+    const id = await restingBuy(2, 10.0)
+    await mockStudent('sss')
+    const sell = await request(app)
+      .post('/orders')
+      .set('X-Api-Key', 's')
+      .send({ token: 'FIKA', side: 'sell', amount: 2, price: 10.0 })
+    await flush()
+    removeSseClient(client)
+
+    const writes = vi.mocked(client.write).mock.calls.map((c) => String(c[0]))
+    const trade = writes.find((w) => w.startsWith('event: trade'))
+    expect(trade).toContain(`"buyOrderId":"${id}"`)
+    expect(trade).toContain(`"sellOrderId":"${sell.body.id}"`)
+  })
+})

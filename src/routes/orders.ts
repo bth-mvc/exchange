@@ -1,7 +1,9 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { nextId } from '../idGen.js'
-import { insertOrder, insufficientFunds, matchOrder } from '../market/matching.js'
+import { db } from '../db.js'
+import type { OrderRow } from '../db.js'
+import { cancelOrder, insertOrder, insufficientFunds, matchOrder } from '../market/matching.js'
 import { getToken, outsidePriceBand } from '../market/tokens.js'
 
 export const ordersRouter = Router()
@@ -47,4 +49,51 @@ ordersRouter.post('/', (req, res) => {
   res.status(201).json({ id: orderId, token, side, amount, price, status: 'open' })
 
   setImmediate(() => matchOrder(orderId))
+})
+
+const ListSchema = z.object({
+  status: z.enum(['open', 'filled', 'cancelled']).default('open'),
+})
+
+function orderView(o: OrderRow) {
+  return {
+    id: o.id,
+    ...(o.user_id && { userId: o.user_id }),
+    token: o.token,
+    side: o.side,
+    amount: o.amount,
+    remaining: o.remaining,
+    price: o.price,
+    status: o.status,
+    createdAt: o.created_at,
+  }
+}
+
+/** The student's own orders with a status, newest first (open ones by default). */
+ordersRouter.get('/', (req, res) => {
+  const result = ListSchema.safeParse(req.query)
+  if (!result.success) {
+    res.status(400).json({ error: result.error.issues[0].message })
+    return
+  }
+
+  const { acronym } = res.locals.student as { acronym: string }
+  const orders = db
+    .prepare(`SELECT * FROM orders WHERE acronym = ? AND status = ? ORDER BY rowid DESC LIMIT 100`)
+    .all(acronym, result.data.status) as OrderRow[]
+  res.json(orders.map(orderView))
+})
+
+ordersRouter.delete('/:id', (req, res) => {
+  const { acronym } = res.locals.student as { acronym: string }
+  const result = cancelOrder(acronym, req.params.id)
+  if (result === 'not-found') {
+    res.status(404).json({ error: 'Order not found' })
+    return
+  }
+  if (result === 'not-open') {
+    res.status(409).json({ error: 'Order is not open: it is already filled or cancelled' })
+    return
+  }
+  res.json(orderView(result))
 })

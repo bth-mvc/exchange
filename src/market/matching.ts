@@ -1,7 +1,7 @@
 import { db, ensureStudent } from '../db.js'
 import type { OrderRow } from '../db.js'
 import { nextId } from '../idGen.js'
-import { enqueueOrderFilled } from '../webhook/queue.js'
+import { enqueueOrderCancelled, enqueueOrderFilled } from '../webhook/queue.js'
 import { broadcast } from './simulator.js'
 import { nudgePrice } from './tokens.js'
 
@@ -164,6 +164,10 @@ export function matchOrder(id: string): void {
       settleFill(taker, fillAmount, fillPrice, timestamp)
       nudgePrice(taker.token, fillPrice, fillAmount * fillPrice)
       broadcast('trade', {
+        // Order ids, not students: a server can mark its own trades without learning who the
+        // other party was.
+        buyOrderId: taker.side === 'buy' ? taker.id : maker.id,
+        sellOrderId: taker.side === 'sell' ? taker.id : maker.id,
         token: taker.token,
         side: taker.side,
         amount: fillAmount,
@@ -183,4 +187,18 @@ export function matchOrder(id: string): void {
 export function placeAndMatch(id: string, input: PlaceOrderInput): void {
   insertOrder(id, input)
   matchOrder(id)
+}
+
+/** Cancels a student's open order. The part that has not filled is released: an open order
+ *  only reserves what it may still spend or deliver, so nothing else needs to change. */
+export function cancelOrder(acronym: string, id: string): OrderRow | 'not-found' | 'not-open' {
+  const order = db.prepare('SELECT * FROM orders WHERE id = ? AND acronym = ?').get(id, acronym) as
+    OrderRow | undefined
+  if (!order) return 'not-found'
+  if (order.status !== 'open') return 'not-open'
+
+  db.prepare(`UPDATE orders SET status = 'cancelled' WHERE id = ?`).run(id)
+  order.status = 'cancelled'
+  enqueueOrderCancelled(order, new Date().toISOString())
+  return order
 }
