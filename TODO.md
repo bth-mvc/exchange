@@ -36,12 +36,48 @@ Mina egna anteckningar: saker att göra i närtid. Idéer till nästa kursrunda 
             matchningsmotorns market-maker (föregående TODO-post) — inte som en separat
             pris-override. Två oberoende sätt att flytta priset på skulle kunna motsäga varandra.
           - Nytt SSE-event `news` bredvid `price`/`trade`, samma mönster. Kontraktet är
-            additivt igen — lägg till, ändra inte befintliga events (studentens SSE-relay från
-            05-60 ska inte behöva ändras för att plocka upp den nya eventtypen).
+            additivt igen — lägg till, ändra inte befintliga events (men se "Obs, relayen" nedan).
           - Tidsfördelen är avsiktlig, inte en bugg att designa bort: en bot som prenumererar på
             `news` och handlar direkt hinner före en människa som läser rubriken — det är precis
             vad kmom10:s trading-bot-uppgift vill demonstrera (algoritmisk reaktionshastighet vs
             manuell handel).
+          - **Obs, relayen:** studentens SSE-klient från 05-60 lyssnar på namngivna events
+            (`addEventListener('price' | 'trade' | …)`), så `news` (och ett ev. `orderbook`) når
+            inte frontenden utan en liten ändring där. Tänkt att läggas i 06-50, och att den
+            första `orderbook`/`news` som kommer fram låser upp handelsvyn i klienten.
+
+          **Två nivåer, takt och prisverkan (skiss 2026-10-28, mockup
+          `teacher/mockups/trading-view.html` i kursrepot):**
+
+          Orderdjupet sätter inte priset hos oss: referenspriset (`token.price`) rör sig av
+          simulatorns brus, dragningen mot `basePrice` och affärernas knuff, och Marvin lägger
+          om sina ordrar runt det varje sekund. En nyhet flyttar därför referenspriset eller
+          `basePrice`, och Marvin och prisbandet följer med inom en sekund. Studenternas
+          liggande ordrar flyttas inte. Det är där det finns pengar att tjäna eller förlora.
+
+          | | Vanlig nyhet | Stor händelse |
+          |---|---|---|
+          | Takt | högst 1 per token och timme, utspritt, ca 1 var 10:e minut totalt | några per dag, mest volatila tokens, aldrig stable |
+          | Storlek | 1–3 % | 10–25 %, upp eller ner |
+          | Flyttar | referenspriset, en knuff som klingar av, dras tillbaka mot `basePrice` | `basePrice`: den nya nivån består |
+          | Förlopp | några sekunder | en ramp på 2–5 min, så att människor hinner reagera |
+          | Förvarning | – | ett rykte (`impact: 'rumor'`) några minuter före, rätt i ca 75 % av fallen |
+
+          - Payloaden för en stor händelse: `impact: 'big'`, plus `pct` (planerad förändring)
+            och `durationSec` (rampen), så att en bot kan räkna på den.
+          - **Tillbaka mot startvärdet över tid:** `basePrice` dras långsamt mot tokenets
+            ursprungliga baspris, och riktningen på en stor händelse lutar dit: ju längre från
+            ursprunget, desto troligare att nästa händelse går tillbaka. Hårt tak
+            0,5–2 × ursprungligt baspris. Ingen token dör eller skenar under kursen, och
+            30-dagarsgrafen får trender som ändå vänder.
+          - **Marvin under en ramp:** bredare spread (t.ex. 2,5×) och ev. mindre volym tills
+            rampen är klar, annars blir han uppäten och slår i positionstaket.
+          - **Med få aktiva studenter** (t.ex. 5) är det i praktiken bara Marvin och nyheterna
+            som rör priset. Glesa nyheter räcker och ger ett lugnt flöde. Takten kan vara
+            konfigurerbar (env) för att kunna ökas när kursen är full.
+          - **Historik:** spara nyheterna (senaste dygnet räcker) så att klienten kan visa dem
+            som markörer i grafen. Stora händelser sparas längre och visas även i
+            30-dagarsvyn (dagliga stängningspriser).
 
           **Beroende**: kräver att matchningsmotorns referensprissättning finns på plats först
           (se posten ovan) — det finns ingen mekanism att hooka nyhetspåverkan i förrän dess.
