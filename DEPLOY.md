@@ -186,6 +186,7 @@ docker compose -f docker-compose.prod.yml logs -f
 docker compose -f docker-compose.prod.yml restart
 
 # Uppdatera manuellt (utan CD) — kräver att en image redan är pushad till GHCR
+export IMAGE_TAG=vX.Y.Z
 git pull && docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d
 
 # Stoppa allt
@@ -210,8 +211,12 @@ Schemalägg med cron:
 
 ```bash
 docker compose -f docker-compose.prod.yml down
+cp /opt/exchange/data/exchange.db /opt/exchange/data/exchange.$(date +%Y%m%d-%H%M)-before-wipe.db
 rm /opt/exchange/data/exchange.db
-docker compose -f docker-compose.prod.yml up -d
+IMAGE_TAG=vX.Y.Z docker compose -f docker-compose.prod.yml up -d
+curl -s https://exchange.dbwebb.se/health   # ska visa rätt version
 ```
+
+> **Ange `IMAGE_TAG`** (senaste release-taggen, `git tag | tail -1`) vid varje `up -d` för hand. CD sätter den, men utan den startar compose `:latest`, som är en gammal image (v1.0.2 från september): plånböcker på 10 000, ingen Marvin och en statisk orderbok. Hände 2026-10-28.
 
 Alla studenters portföljer och handelshistorik raderas. Studenternas API-nycklar berörs inte (de lever i api-servern).
