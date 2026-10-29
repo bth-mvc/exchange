@@ -9,6 +9,19 @@ Mina egna anteckningar: saker att göra i närtid. Idéer till nästa kursrunda 
       hans värde på leaderboarden: växer det stadigt är spreaden för bred för studenterna, sjunker
       det har någon hittat ett sätt att lura honom. Justera i `.env` på do5 vid behov.
 
+- [ ] **Fundering: långa trender.** Idag dras `basePrice` alltid tillbaka mot tokenets
+      `startPrice` (`BASE_REVERSION` i `simulator.ts`), och stora händelser lutar åt samma håll
+      (`bigEventDirection` i `news.ts`). Därför syns det rätt tydligt var de högsta och lägsta
+      kurserna ligger, och "köp lågt, sälj högt" mot startnivån blir en säker strategi. Idé
+      (2026-10-29): ge ibland en token en trend, sakta uppåt eller nedåt under dagar eller
+      veckor. Till exempel ett eget mål som rör sig några procent per dygn under en period,
+      och som reversionen och riktningen på stora händelser drar mot i stället för den fasta
+      `startPrice`. Fortfarande med det hårda taket 0,5–2 × ursprungligt baspris, och bara på
+      volatila tokens. Öppna frågor: hur ofta, hur stark, och om trenden ska synas, t.ex. som
+      en nyhet ("analytiker tror på ..."), eller bara märkas i 30-dagarsgrafen. Pedagogiskt
+      ger det 10-30 ett verkligt val mellan att följa trenden (glidande medelvärde) och att
+      satsa på att priset vänder.
+
 - [ ] `npm audit`: 3 kvarvarande moderate-varningar i vitest/@vitest/coverage-v8/@vitest/mocker
       (path traversal i mock-redirect, GHSA-82fw-gwwq-j7x9). Dev-only, ingen fix uppströms
       ännu — bevaka och kör `npm audit fix` när en patchad version finns.
