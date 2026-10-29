@@ -15,6 +15,7 @@ const schema = z.object({
   MARKET_MAKER_LEVEL_STEP_PCT: z.coerce.number().default(0.01),
   MARKET_MAKER_QUOTE_VALUE: z.coerce.number().default(5000),
   MARKET_MAKER_MAX_POSITION_VALUE: z.coerce.number().default(50_000),
+  MARKET_MAKER_REFILL_PCT: z.coerce.number().default(0.1),
   PRICE_BAND_PCT: z.coerce.number().default(0.1),
   PRICE_IMPACT: z.coerce.number().default(0.25),
   PRICE_REVERSION: z.coerce.number().default(0.02),

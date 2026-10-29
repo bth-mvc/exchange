@@ -3,8 +3,9 @@
 Mina egna anteckningar: saker att göra i närtid. Idéer till nästa kursrunda ligger i
 `FUTURE.md`.
 
-- [ ] **Följ Marvin (market makern) under kursen.** Prisband, knuffat referenspris, passiva
-      ordrar och positionsgräns finns sedan 2026-10-26 (se CLAUDE.md, Prissättning). Håll koll på
+- [ ] **Följ Marvin (market makern) under kursen.** Prisband, knuffat referenspris, stege,
+      positionsgräns (2026-10-26) och att han tar korsande studentordrar och fyller på stegvis
+      (2026-10-29) finns (se CLAUDE.md, Prissättning). Håll koll på
       hans värde på leaderboarden: växer det stadigt är spreaden för bred för studenterna, sjunker
       det har någon hittat ett sätt att lura honom. Justera i `.env` på do5 vid behov.
 

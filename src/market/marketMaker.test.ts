@@ -129,13 +129,13 @@ describe('runMarketMakerSweep', () => {
     expect(db.prepare('SELECT acronym FROM webhooks').all()).toEqual([{ acronym: 'aaa' }])
   })
 
-  it('never takes a student order, it skips the side that would cross it', () => {
+  it('fills a student order that crosses its quote, at the student price', () => {
     placeAndMatch('order-cheap-sell', {
       acronym: 'aaa',
       token: 'FIKA',
       side: 'sell',
       amount: 5,
-      price: 5.0,
+      price: 9.5,
     })
 
     runMarketMakerSweep()
@@ -143,32 +143,44 @@ describe('runMarketMakerSweep', () => {
     const order = db
       .prepare('SELECT * FROM orders WHERE id = ?')
       .get('order-cheap-sell') as OrderRow
-    expect(order.status).toBe('open')
-    expect(sides('FIKA')).toEqual(['sell'])
+    expect(order.status).toBe('filled')
+    const trade = db.prepare('SELECT * FROM trades WHERE acronym = ?').get('aaa') as TradeRow
+    expect(trade.price).toBe(9.5)
+    expect(db.prepare('SELECT acronym FROM webhooks').all()).toEqual([{ acronym: 'aaa' }])
   })
 
-  it('skips only the levels that would cross a student order', () => {
-    runMarketMakerSweep()
-    const bids = mmOrders('FIKA')
-      .filter((o) => o.side === 'buy')
-      .sort((a, b) => b.price - a.price)
-    // A student sell between the second and third bid crosses the two best ones
-    // (the market maker's quotes are removed first, or the sell would fill against them)
-    const price = +((bids[1].price + bids[2].price) / 2).toFixed(2)
-    db.prepare(`DELETE FROM orders WHERE acronym = ?`).run(MM)
-    placeAndMatch('order-between', {
+  it('keeps a full book on the side that crossed a student order', () => {
+    placeAndMatch('order-high-bid', {
       acronym: 'aaa',
       token: 'FIKA',
-      side: 'sell',
-      amount: 1,
-      price,
+      side: 'buy',
+      amount: 5,
+      price: 10.5,
     })
 
     runMarketMakerSweep()
 
-    const left = mmOrders('FIKA').filter((o) => o.side === 'buy')
-    expect(left).toHaveLength(env.MARKET_MAKER_LEVELS - 2)
-    expect(Math.max(...left.map((o) => o.price))).toBeLessThan(price)
+    const asks = mmOrders('FIKA').filter((o) => o.side === 'sell')
+    expect(asks).toHaveLength(env.MARKET_MAKER_LEVELS)
+    // The level that traded rests with what is left of it
+    expect(Math.min(...asks.map((o) => o.remaining))).toBe(quoteAmount(10.0) - 5)
+  })
+
+  it('keeps what is left of a level after a trade, and refills it a little per sweep', () => {
+    runMarketMakerSweep()
+    const ask = bestQuotes('FIKA').ask
+    placeAndMatch('order-take', {
+      acronym: 'aaa',
+      token: 'FIKA',
+      side: 'buy',
+      amount: 100,
+      price: ask.price,
+    })
+
+    runMarketMakerSweep()
+
+    const refill = Math.ceil(ask.amount * env.MARKET_MAKER_REFILL_PCT)
+    expect(bestQuotes('FIKA').ask.remaining).toBe(ask.amount - 100 + refill)
   })
 
   it('goes short when it sells more than it holds', () => {

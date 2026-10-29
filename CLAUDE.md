@@ -179,8 +179,12 @@ Sex tokens i tre kategorier:
   referenspriset, så två studenter kan inte flytta marknaden med en affär till ett påhittat pris.
 - **Marvin** (`MARKET_MAKER_ACRONYM`, `marvin`) lägger varje sekund en stege per token och sida:
   `MARKET_MAKER_LEVELS` (5) nivåer, den första ±2 % kring referenspriset och värd ca 5 000 kr,
-  varje nästa `MARKET_MAKER_LEVEL_STEP_PCT` (1 %) längre ut och en halv order större. Han tar
-  aldrig en students order: korsar en nivå en students vilande order hoppar han över den nivån. Han går inte igenom
+  varje nästa `MARKET_MAKER_LEVEL_STEP_PCT` (1 %) längre ut och en halv order större. Korsar en
+  nivå en students vilande order handlar han med den till studentens pris och resten av nivån
+  vilar (före 1.5.1 hoppade han över nivån, vilket tömde en hel sida av boken när någon bjöd över
+  hans säljstege). En nivå som någon handlat mot behåller det som är kvar och fylls på med
+  `MARKET_MAKER_REFILL_PCT` (10 %) av sin storlek per svep, så studenten ser sin affär i boken i
+  stället för att nästa svep döljer den. Han går inte igenom
   saldokontrollen och kan blanka (negativt innehav), men slutar köpa eller sälja en token när
   positionen passerar `MARKET_MAKER_MAX_POSITION_VALUE` (50 000 kr). Han syns på leaderboarden
   (`marketMaker: true`); hans vinst eller förlust är värdet minus startkapitalet 100 000.
