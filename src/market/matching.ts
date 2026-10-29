@@ -4,6 +4,8 @@ import { nextId } from '../idGen.js'
 import { enqueueOrderCancelled, enqueueOrderFilled } from '../webhook/queue.js'
 import { broadcast } from './simulator.js'
 import { nudgePrice } from './tokens.js'
+import { recordMarketTrade } from './marketTrades.js'
+import type { MarketTrade } from './marketTrades.js'
 
 export interface PlaceOrderInput {
   acronym: string
@@ -163,7 +165,7 @@ export function matchOrder(id: string): void {
       settleFill(maker, fillAmount, fillPrice, timestamp)
       settleFill(taker, fillAmount, fillPrice, timestamp)
       nudgePrice(taker.token, fillPrice, fillAmount * fillPrice)
-      broadcast('trade', {
+      const trade: MarketTrade = {
         // Order ids, not students: a server can mark its own trades without learning who the
         // other party was.
         buyOrderId: taker.side === 'buy' ? taker.id : maker.id,
@@ -174,7 +176,9 @@ export function matchOrder(id: string): void {
         price: fillPrice,
         total: fillAmount * fillPrice,
         timestamp,
-      })
+      }
+      recordMarketTrade(trade)
+      broadcast('trade', trade)
 
       taker = getOrder(taker.id)
     }

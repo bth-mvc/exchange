@@ -53,6 +53,7 @@ beforeEach(async () => {
   db.prepare('DELETE FROM students').run()
   db.prepare('DELETE FROM webhooks').run()
   db.prepare('DELETE FROM value_days').run()
+  db.prepare('DELETE FROM market_trades').run()
 })
 
 describe('GET /assets', () => {
@@ -603,6 +604,47 @@ describe('GET /assets/:id/history', () => {
   it('refuses an unknown token or range', async () => {
     expect((await request(app).get('/assets/NOPE/history')).status).toBe(404)
     expect((await request(app).get('/assets/FIKA/history?range=1y')).status).toBe(400)
+  })
+})
+
+describe('GET /assets/:id/trades', () => {
+  it('returns the latest fills on the token, newest first, without students', async () => {
+    await mockStudent('qqx')
+    await request(app).post('/orders').set('X-Api-Key', 'a').send({
+      token: 'FIKA',
+      side: 'sell',
+      amount: 3,
+      price: 9.5,
+    })
+    await flush()
+    await mockStudent('qqy')
+    const buy = await request(app).post('/orders').set('X-Api-Key', 'b').send({
+      token: 'FIKA',
+      side: 'buy',
+      amount: 2,
+      price: 9.5,
+    })
+    await flush()
+
+    const res = await request(app).get('/assets/fika/trades?limit=5')
+    expect(res.status).toBe(200)
+    expect(res.body.token).toBe('FIKA')
+    expect(res.body.trades).toHaveLength(1)
+    expect(res.body.trades[0]).toMatchObject({
+      buyOrderId: buy.body.id,
+      token: 'FIKA',
+      side: 'buy',
+      amount: 2,
+      price: 9.5,
+      total: 19,
+    })
+    expect(JSON.stringify(res.body)).not.toMatch(/qqx|qqy/)
+  })
+
+  it('refuses an unknown token or a bad limit', async () => {
+    expect((await request(app).get('/assets/NOPE/trades')).status).toBe(404)
+    expect((await request(app).get('/assets/FIKA/trades?limit=0')).status).toBe(400)
+    expect((await request(app).get('/assets/FIKA/trades?limit=abc')).status).toBe(400)
   })
 })
 

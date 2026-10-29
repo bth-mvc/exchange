@@ -101,6 +101,21 @@ db.exec(`
     PRIMARY KEY (acronym, day)
   );
 
+  -- Every fill as the trade event shows it, with order ids and no students. Kept for a day.
+  CREATE TABLE IF NOT EXISTS market_trades (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    token         TEXT NOT NULL,
+    buy_order_id  TEXT NOT NULL,
+    sell_order_id TEXT NOT NULL,
+    side          TEXT NOT NULL,
+    amount        INTEGER NOT NULL,
+    price         REAL NOT NULL,
+    total         REAL NOT NULL,
+    timestamp     TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_market_trades ON market_trades (token, timestamp);
+
   CREATE TABLE IF NOT EXISTS token_state (
     token      TEXT PRIMARY KEY,
     price      REAL NOT NULL,

@@ -3,6 +3,7 @@ import { tokens, getToken } from '../market/tokens.js'
 import { orderbook } from '../market/orderbook.js'
 import { priceHistory, ranges } from '../market/history.js'
 import type { Range } from '../market/history.js'
+import { recentTrades } from '../market/marketTrades.js'
 
 export const assetsRouter = Router()
 
@@ -35,4 +36,19 @@ assetsRouter.get('/:id/history', (req, res) => {
     return
   }
   res.json({ token: token.id, range, points: priceHistory(token.id, range) })
+})
+
+/** The token's latest trades on the exchange, newest first, as the `trade` event shows them. */
+assetsRouter.get('/:id/trades', (req, res) => {
+  const token = getToken(req.params.id)
+  if (!token) {
+    res.status(404).json({ error: 'Token not found' })
+    return
+  }
+  const limit = Number(req.query.limit ?? 20)
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    res.status(400).json({ error: 'limit must be a whole number from 1 to 100' })
+    return
+  }
+  res.json({ token: token.id, trades: recentTrades(token.id, limit) })
 })

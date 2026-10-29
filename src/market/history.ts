@@ -12,7 +12,8 @@ export interface PricePoint {
 }
 
 /** Saves every token's price as a tick, updates today's close and stores price and base price,
- *  so a restart continues where the market was. Ticks older than a day are deleted. */
+ *  so a restart continues where the market was. Ticks and market trades older than a day are
+ *  deleted. */
 export function recordPrices(now = new Date()): void {
   const timestamp = now.toISOString()
   const day = timestamp.slice(0, 10)
@@ -31,9 +32,9 @@ export function recordPrices(now = new Date()): void {
       close.run(t.id, day, t.price)
       state.run(t.id, t.price, t.basePrice)
     }
-    db.prepare(`DELETE FROM price_ticks WHERE timestamp < ?`).run(
-      new Date(now.getTime() - 86_400_000).toISOString(),
-    )
+    const dayAgo = new Date(now.getTime() - 86_400_000).toISOString()
+    db.prepare(`DELETE FROM price_ticks WHERE timestamp < ?`).run(dayAgo)
+    db.prepare(`DELETE FROM market_trades WHERE timestamp < ?`).run(dayAgo)
   })()
 }
 

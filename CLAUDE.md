@@ -45,6 +45,7 @@ plus `RateLimit-Limit` och `RateLimit-Remaining` på alla svar. Studenternas ret
 | `GET` | `/assets` | Lista alla tokens med aktuellt pris |
 | `GET` | `/assets/:id/orderbook` | Orderbok för en specifik token |
 | `GET` | `/assets/:id/history?range=10m\|1d\|30d` | Prispunkter äldst först: varje tick, sista per 5 min, stängning per dag |
+| `GET` | `/assets/:id/trades?limit=` | Senaste affärerna på börsen för en token, nyast först, som `trade`-eventet (order-id:n, inga studenter); sparas ett dygn i `market_trades` |
 | `POST` | `/orders` | Lägg en order (buy/sell) |
 | `GET` | `/orders?status=open` | Egna ordrar med status (`open`/`filled`/`cancelled`), nyast först, max 100 |
 | `DELETE` | `/orders/:id` | Avbryt en egen öppen order (404 annans/okänd, 409 ej öppen) |
