@@ -126,14 +126,10 @@ export function pickNewsToken(
   return undefined
 }
 
-/** Up or down for a big event. It leans back towards the start price: the further the base
- *  price has moved from it, the more likely the next event goes back. */
-export function bigEventDirection(
-  basePrice: number,
-  startPrice: number,
-  rand = Math.random,
-): 1 | -1 {
-  const pUp = Math.min(0.85, Math.max(0.15, 0.5 - Math.log(basePrice / startPrice)))
+/** Up or down for a big event or a trend. It leans towards `anchor`: the further the price
+ *  has moved from it, the more likely the next move goes back. */
+export function bigEventDirection(price: number, anchor: number, rand = Math.random): 1 | -1 {
+  const pUp = Math.min(0.85, Math.max(0.15, 0.5 - Math.log(price / anchor)))
   return rand() < pUp ? 1 : -1
 }
 
@@ -220,14 +216,16 @@ export function pruneNews(now = Date.now()): void {
 }
 
 /** Publishes one small news item and gives the price a short push of 1-3 %, which the
- *  simulator then pulls back towards the base price. Neutral news does not move it. */
+ *  simulator then pulls back towards the base price. Neutral news does not move it. A token in
+ *  a trend gets news in the trend's direction a bit more often (TREND_NEWS_LEAN). */
 export function smallNews(rand = Math.random): News | undefined {
   const token = pickNewsToken(tokens, lastNewsAt, Date.now(), rand)
   if (!token || token.inEvent) return undefined
   lastNewsAt.set(token.id, Date.now())
 
+  const lean = token.trend ? Math.sign(token.trend.pctPerDay) * env.TREND_NEWS_LEAN : 0
   const r = rand()
-  const sentiment: Sentiment = r < 0.4 ? 'positive' : r < 0.8 ? 'negative' : 'neutral'
+  const sentiment: Sentiment = r < 0.4 + lean ? 'positive' : r < 0.8 ? 'negative' : 'neutral'
   const impact = sentiment === 'neutral' ? 'low' : pick(['low', 'medium', 'high'] as const, rand)
   const news = publish({
     token: token.id,
@@ -251,7 +249,7 @@ export function bigEvent(rand = Math.random): News | undefined {
   const token = pick(free, rand)
   token.inEvent = true
 
-  const direction = bigEventDirection(token.basePrice, token.startPrice, rand)
+  const direction = bigEventDirection(token.basePrice, token.anchor, rand)
   const change = bigEventChange(token.basePrice, token.startPrice, 0.1 + rand() * 0.15, direction)
   const rumorRight = rand() < env.RUMOR_ACCURACY
   const rumorSentiment = (rumorRight ? direction : -direction) > 0 ? 'positive' : 'negative'

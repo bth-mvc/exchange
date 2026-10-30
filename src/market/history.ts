@@ -11,8 +11,8 @@ export interface PricePoint {
   price: number
 }
 
-/** Saves every token's price as a tick, updates today's close and stores price and base price,
- *  so a restart continues where the market was. Ticks and market trades older than a day are
+/** Saves every token's price as a tick, updates today's close and stores price, base price,
+ *  anchor and trend, so a restart continues where the market was. Ticks and market trades older than a day are
  *  deleted. */
 export function recordPrices(now = new Date()): void {
   const timestamp = now.toISOString()
@@ -23,14 +23,24 @@ export function recordPrices(now = new Date()): void {
      ON CONFLICT (token, day) DO UPDATE SET close = excluded.close`,
   )
   const state = db.prepare(
-    `INSERT INTO token_state (token, price, base_price) VALUES (?, ?, ?)
-     ON CONFLICT (token) DO UPDATE SET price = excluded.price, base_price = excluded.base_price`,
+    `INSERT INTO token_state (token, price, base_price, anchor, trend_pct, trend_ends_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT (token) DO UPDATE SET price = excluded.price, base_price = excluded.base_price,
+       anchor = excluded.anchor, trend_pct = excluded.trend_pct,
+       trend_ends_at = excluded.trend_ends_at`,
   )
   db.transaction(() => {
     for (const t of tokens) {
       tick.run(t.id, timestamp, t.price)
       close.run(t.id, day, t.price)
-      state.run(t.id, t.price, t.basePrice)
+      state.run(
+        t.id,
+        t.price,
+        t.basePrice,
+        t.anchor,
+        t.trend?.pctPerDay ?? null,
+        t.trend?.endsAt ?? null,
+      )
     }
     const dayAgo = new Date(now.getTime() - 86_400_000).toISOString()
     db.prepare(`DELETE FROM price_ticks WHERE timestamp < ?`).run(dayAgo)
@@ -60,18 +70,26 @@ export function recordValues(now = new Date()): void {
   })()
 }
 
-/** Puts back the prices and base prices saved before a restart. */
+/** Puts back the prices, base prices, anchors and trends saved before a restart. */
 export function loadTokenState(): void {
-  const rows = db.prepare(`SELECT token, price, base_price FROM token_state`).all() as {
+  const rows = db.prepare(`SELECT * FROM token_state`).all() as {
     token: string
     price: number
     base_price: number
+    anchor: number | null
+    trend_pct: number | null
+    trend_ends_at: number | null
   }[]
   for (const row of rows) {
     const token = tokens.find((t) => t.id === row.token)
     if (token) {
       token.price = row.price
       token.basePrice = row.base_price
+      token.anchor = row.anchor ?? token.startPrice
+      token.trend =
+        row.trend_pct !== null && row.trend_ends_at !== null
+          ? { pctPerDay: row.trend_pct, endsAt: row.trend_ends_at }
+          : undefined
     }
   }
 }

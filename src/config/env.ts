@@ -34,6 +34,16 @@ const schema = z.object({
   RUMOR_ACCURACY: z.coerce.number().min(0).max(1).default(0.75),
   NEWS_KEEP_DAYS: z.coerce.number().default(1),
   BIG_EVENT_KEEP_DAYS: z.coerce.number().default(60),
+  TREND_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  TREND_GAP_MS: z.coerce.number().default(345_600_000),
+  TREND_MIN_DAYS: z.coerce.number().default(3),
+  TREND_MAX_DAYS: z.coerce.number().default(10),
+  TREND_MIN_PCT: z.coerce.number().default(0.005),
+  TREND_MAX_PCT: z.coerce.number().default(0.02),
+  TREND_NEWS_LEAN: z.coerce.number().default(0.1),
   HISTORY_SAMPLE_MS: z.coerce.number().default(10_000),
   RATE_LIMIT_MAX: z.coerce.number().default(120),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),

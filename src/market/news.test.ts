@@ -37,7 +37,7 @@ const original = tokens.map((t) => ({ ...t }))
 
 beforeEach(() => {
   db.prepare('DELETE FROM news').run()
-  tokens.forEach((t, i) => Object.assign(t, original[i], { inEvent: false }))
+  tokens.forEach((t, i) => Object.assign(t, original[i], { inEvent: false, trend: undefined }))
 })
 
 describe('pickNewsToken', () => {
@@ -68,7 +68,7 @@ describe('bigEventDirection', () => {
     expect(bigEventDirection(10, 10, () => 0.51)).toBe(-1)
   })
 
-  it('leans back towards the start price', () => {
+  it('leans back towards the anchor', () => {
     expect(bigEventDirection(15, 10, () => 0.3)).toBe(-1)
     expect(bigEventDirection(7, 10, () => 0.7)).toBe(1)
   })
@@ -115,6 +115,12 @@ describe('smallNews', () => {
     expect(recentNews({ limit: 10 })).toEqual([news])
     expect(getToken('HODL')!.price).toBeCloseTo(103)
     expect(getToken('HODL')!.basePrice).toBe(100)
+  })
+
+  it('leans towards the direction of a trend', () => {
+    for (const t of tokens) t.trend = { pctPerDay: -0.01, endsAt: Infinity }
+    // token pick, 0.35 is positive without a trend
+    expect(smallNews(sequence(0.99, 0.35, 0.9, 0))!.sentiment).toBe('negative')
   })
 })
 

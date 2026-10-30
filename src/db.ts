@@ -117,11 +117,22 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_market_trades ON market_trades (token, timestamp);
 
   CREATE TABLE IF NOT EXISTS token_state (
-    token      TEXT PRIMARY KEY,
-    price      REAL NOT NULL,
-    base_price REAL NOT NULL
+    token         TEXT PRIMARY KEY,
+    price         REAL NOT NULL,
+    base_price    REAL NOT NULL,
+    anchor        REAL,
+    trend_pct     REAL,
+    trend_ends_at INTEGER
   );
 `)
+
+// Databases from before trends: add the columns; a missing anchor is the start price.
+const stateColumns = db.prepare(`PRAGMA table_info(token_state)`).all() as { name: string }[]
+if (!stateColumns.some((c) => c.name === 'anchor')) {
+  db.exec(`ALTER TABLE token_state ADD COLUMN anchor REAL`)
+  db.exec(`ALTER TABLE token_state ADD COLUMN trend_pct REAL`)
+  db.exec(`ALTER TABLE token_state ADD COLUMN trend_ends_at INTEGER`)
+}
 
 // Databases from before webhook secrets: add the column; ensureStudent fills it in.
 const studentColumns = db.prepare(`PRAGMA table_info(students)`).all() as { name: string }[]

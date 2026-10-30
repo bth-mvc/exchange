@@ -167,9 +167,10 @@ Sex tokens i tre kategorier:
 - **Referenspris** (`token.price`): det marknaden visar, det Marvin lägger sina ordrar kring och det
   innehav värderas till på leaderboarden. Prissimulatorn slumpar det ±2 % och drar det sakta
   tillbaka mot baspriset (`PRICE_REVERSION`). Baspriset är startpriset tills en stor nyhet
-  flyttar det, och dras i sin tur mycket sakta tillbaka mot startpriset (`BASE_REVERSION`).
-  Pris och baspris sparas var `HISTORY_SAMPLE_MS` (10 s) i `token_state`, så en omstart
-  fortsätter där marknaden var. `/assets` visar bara `id`, `name`, `type` och `price`: baspriset
+  eller en trend flyttar det, och dras i sin tur mycket sakta tillbaka mot ankaret
+  (`BASE_REVERSION`), se Trender nedan.
+  Pris, baspris, ankare och trend sparas var `HISTORY_SAMPLE_MS` (10 s) i `token_state`, så en
+  omstart fortsätter där marknaden var. `/assets` visar bara `id`, `name`, `type` och `price`: baspriset
   säger vart priset är på väg och ska inte ges bort till en bot.
 - **Historik:** samma sampling sparar en tick per token i `price_ticks` (ett dygn) och dagens
   stängningspris i `price_days` (för alltid), för `GET /assets/:id/history`. Första samplingen
@@ -208,10 +209,29 @@ att reagera på. Varje nyhet skickas som SSE `news` och sparas i tabellen `news`
 
 - **Rykte:** `RUMOR_LEAD_MS` (3 min) före en stor händelse, rätt riktning i `RUMOR_ACCURACY`
   (75 %) av fallen.
-- **Riktning:** lutar tillbaka mot startpriset (ju längre bort, desto troligare tillbaka), och
+- **Riktning:** lutar tillbaka mot ankaret (ju längre bort, desto troligare tillbaka), och
   baspriset hålls inom 0,5–2 × startpriset. Ingen token dör eller skenar.
 - **Marvin under en ramp:** spreaden är `MARKET_MAKER_EVENT_SPREAD_FACTOR` (2,5) gånger bredare.
 - `NEWS_ENABLED=false` stänger av flödet. Med många aktiva studenter kan takten ökas.
+
+## Trender
+
+Utan trender dras allt tillbaka mot startpriset, och "köp under startpriset, sälj över" blir en
+säker strategi. Därför har varje token ett **ankare** (`token.anchor`, från början startpriset):
+det baspriset dras mot och det stora händelser lutar mot. En trend (`src/market/trend.ts`) flyttar
+ankaret och baspriset lika mycket, så en token kan glida uppåt eller nedåt i dagar.
+
+- Bara volatila tokens. En token utan trend får en i snitt var `TREND_GAP_MS` (4 dygn), som varar
+  `TREND_MIN_DAYS`–`TREND_MAX_DAYS` (3–10) dygn med `TREND_MIN_PCT`–`TREND_MAX_PCT`
+  (0,5–2 %) per dygn. Flyttas varje minut.
+- Riktningen lutar tillbaka mot startpriset på samma sätt som en stor händelse, och ankaret hålls
+  inom 0,5–2 × startpriset (trenden slutar där). Över kursen vänder trenderna alltså ändå.
+- Trenden syns inte som en egen händelse (kontraktet är oförändrat). Den syns i
+  30-dagarsgrafen, och vanliga nyheter går oftare åt trendens håll: sannolikheten för positiv
+  förskjuts med `TREND_NEWS_LEAN` (10 procentenheter). En bot som räknar sentiment över tid kan
+  alltså ana den.
+- Ankare och trend sparas i `token_state`. En trend som startar loggas (`Trend YOLO: ...`).
+  `TREND_ENABLED=false` stänger av dem.
 
 ## Lokal mock (i student-skeletonen)
 
@@ -263,6 +283,7 @@ Om api-servern inte svarar och nyckeln inte finns i cachen → returnera `401 Un
 | `RATE_LIMIT_WINDOW_MS` | `60000` | Rate limit-fönstrets längd i ms |
 | `HISTORY_SAMPLE_MS` | `10000` | Hur ofta priserna sparas (historik och omstart) |
 | `NEWS_ENABLED`, `NEWS_*`, `BIG_EVENT_*`, `RUMOR_*`, `BASE_REVERSION`, `MARKET_MAKER_EVENT_SPREAD_FACTOR` | se `src/config/env.ts` | Nyhetsflödet, se Nyheter ovan |
+| `TREND_ENABLED`, `TREND_*` | se `src/config/env.ts` | Trender, se Trender ovan |
 
 ## API-dokumentation
 

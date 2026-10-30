@@ -24,7 +24,7 @@ export function startPriceSimulator(): void {
     const token = tokens[Math.floor(Math.random() * tokens.length)]
     const noise = token.price * (Math.random() * 0.04 - 0.02)
     const pull = (token.basePrice - token.price) * env.PRICE_REVERSION
-    token.basePrice += (token.startPrice - token.basePrice) * env.BASE_REVERSION
+    token.basePrice += (token.anchor - token.basePrice) * env.BASE_REVERSION
     setPrice(token.id, token.price + noise + pull)
     broadcast('price', { token: token.id, price: token.price, timestamp: new Date().toISOString() })
   }, 3000)

@@ -9,7 +9,9 @@ Mina egna anteckningar: saker att göra i närtid. Idéer till nästa kursrunda 
       hans värde på leaderboarden: växer det stadigt är spreaden för bred för studenterna, sjunker
       det har någon hittat ett sätt att lura honom. Justera i `.env` på do5 vid behov.
 
-- [ ] **Fundering: långa trender.** Idag dras `basePrice` alltid tillbaka mot tokenets
+- [x] **Långa trender** — **klar** (2026-10-30, se CLAUDE.md, Trender): ett ankare per token
+      som en trend flyttar, bara volatila, inte synligt i kontraktet men nyheterna lutar åt
+      trendens håll. Ursprunglig text: idag dras `basePrice` alltid tillbaka mot tokenets
       `startPrice` (`BASE_REVERSION` i `simulator.ts`), och stora händelser lutar åt samma håll
       (`bigEventDirection` i `news.ts`). Därför syns det rätt tydligt var de högsta och lägsta
       kurserna ligger, och "köp lågt, sälj högt" mot startnivån blir en säker strategi. Idé
@@ -26,7 +28,8 @@ Mina egna anteckningar: saker att göra i närtid. Idéer till nästa kursrunda 
       (path traversal i mock-redirect, GHSA-82fw-gwwq-j7x9). Dev-only, ingen fix uppströms
       ännu — bevaka och kör `npm audit fix` när en patchad version finns.
 
-- [ ] **Spår A — nyhetsflöde utan AI** (SSE `news`-event) — svängningar med en förklaring,
+- [x] **Spår A — nyhetsflöde utan AI** — **klar** (3dd17f9; i kursrepot läser 06-50/06-60
+      och 10-30 nyheterna). Ursprunglig text: (SSE `news`-event) — svängningar med en förklaring,
       inte bara brus. Enklare lösning, kör vidare på den här. Bygg efter matchningsmotorn
       ovan, inte innan (se beroende nedan).
 

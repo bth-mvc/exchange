@@ -9,7 +9,7 @@ beforeEach(() => {
   db.prepare('DELETE FROM price_ticks').run()
   db.prepare('DELETE FROM price_days').run()
   db.prepare('DELETE FROM token_state').run()
-  tokens.forEach((t, i) => Object.assign(t, original[i]))
+  tokens.forEach((t, i) => Object.assign(t, original[i], { trend: undefined }))
 })
 
 /** Records FIKA at each price, `stepMs` apart, starting at `start`. */
@@ -69,6 +69,18 @@ describe('loadTokenState', () => {
     expect(yolo.price).toBe(5.5)
     expect(yolo.basePrice).toBe(5.25)
     expect(yolo.startPrice).toBe(4.2)
+  })
+
+  it('puts back the anchor and trend', () => {
+    const yolo = getToken('YOLO')!
+    yolo.anchor = 4.5
+    yolo.trend = { pctPerDay: 0.01, endsAt: 1_800_000_000_000 }
+    recordPrices()
+    Object.assign(yolo, { anchor: 4.2, trend: undefined })
+
+    loadTokenState()
+    expect(yolo.anchor).toBe(4.5)
+    expect(yolo.trend).toEqual({ pctPerDay: 0.01, endsAt: 1_800_000_000_000 })
   })
 })
 
